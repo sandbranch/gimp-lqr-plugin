@@ -42,7 +42,7 @@ plugin = executable('gimp-lqr-plugin',
     include_directories('.'),
     include_directories('..'),
   ],
-  dependencies : [gimp_dep, gimpui_dep, lqr_dep],
+  dependencies : [gimp_dep, gimpui_dep, lqr_dep, math_dep],
   install : true,
   install_dir : bindir
 ) 

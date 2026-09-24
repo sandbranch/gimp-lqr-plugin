@@ -24,6 +24,8 @@ gimp_required_version = '>= 3.0.0'
 gimp_dep = dependency('gimp-3.0', version : gimp_required_version)
 gimpui_dep = dependency('gimpui-3.0', version : gimp_required_version)
 lqr_dep = dependency('lqr-1', version : '>= 0.4.0')
+# liblqr uses libm, which its pkg-config file does not name for static builds
+math_dep = cc.find_library('m', required : false)
 
 # Gettext
 i18n = import('i18n')

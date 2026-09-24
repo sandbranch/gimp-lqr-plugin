@@ -28,38 +28,78 @@
 
 #include "main_common.h"
 
-guchar *
-rgb_buffer_from_layer(gint32 layer_ID) {
-    gint y, bpp;
+/* The pixels of the layer to rescale, as float in the colour space of the
+   layer, so that 16-bit and floating point images keep their precision and
+   liblqr sees real channel values. */
+const Babl *
+layer_pixel_format(gint32 layer_ID) {
+    GimpDrawable *drawable = gimp_drawable_get_by_id(layer_ID);
+    const Babl *space = babl_format_get_space(gimp_drawable_get_format(drawable));
+    const gchar *name;
+
+    if (gimp_drawable_is_rgb(drawable)) {
+        name = gimp_drawable_has_alpha(drawable) ? "R'G'B'A float" : "R'G'B' float";
+    } else {
+        name = gimp_drawable_has_alpha(drawable) ? "Y'A float" : "Y' float";
+    }
+
+    return babl_format_with_space(name, space);
+}
+
+gint
+layer_channels(gint32 layer_ID) {
+    return babl_format_get_n_components(layer_pixel_format(layer_ID));
+}
+
+gfloat *
+float_buffer_from_layer(gint32 layer_ID) {
     gint w, h;
+    gsize size;
     GeglBuffer *buffer_in;
-    guchar *buffer;
-    gint update_step;
+    gfloat *buffer;
+    const Babl *format = layer_pixel_format(layer_ID);
 
     gimp_progress_init(_("Parsing layer..."));
 
     w = gimp_drawable_get_width_id(layer_ID);
     h = gimp_drawable_get_height_id(layer_ID);
 
-    bpp = gimp_drawable_bpp_id(layer_ID);
-
-    LQR_TRY_N_N (buffer = g_try_new(guchar, bpp * w * h));
-
-    buffer_in = gimp_drawable_get_buffer(GIMP_DRAWABLE(gimp_drawable_get_by_id(layer_ID)));
-
-    gegl_buffer_get(buffer_in, GEGL_RECTANGLE (0, 0, w, h), 1.0, NULL, buffer, GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
-
-    for (y = 0; y < h; y++) {
-
-        update_step = MAX ((h - 1) / 20, 1);
-        if (y % update_step == 0) {
-            gimp_progress_update((gdouble) y / (h - 1));
-        }
+    if (!g_size_checked_mul(&size, w, h) ||
+        !g_size_checked_mul(&size, size, babl_format_get_n_components(format))) {
+        return NULL;
     }
+    LQR_TRY_N_N (buffer = g_try_new(gfloat, size));
 
+    buffer_in = gimp_drawable_get_buffer(gimp_drawable_get_by_id(layer_ID));
+    gegl_buffer_get(buffer_in, GEGL_RECTANGLE (0, 0, w, h), 1.0, format, buffer,
+                    GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
     g_object_unref(buffer_in);
 
     gimp_progress_end();
+
+    return buffer;
+}
+
+/* Masks are painted marks, whose strength liblqr reads from 8-bit values,
+   as the plugin got them in GIMP 2. Any mask layer is read as 8-bit RGBA. */
+#define MASK_CHANNELS 4
+
+static guchar *
+mask_buffer_from_layer(gint32 layer_ID) {
+    gint w, h;
+    GeglBuffer *buffer_in;
+    guchar *buffer;
+
+    w = gimp_drawable_get_width_id(layer_ID);
+    h = gimp_drawable_get_height_id(layer_ID);
+
+    LQR_TRY_N_N (buffer = g_try_new(guchar, (gsize) MASK_CHANNELS * w * h));
+
+    buffer_in = gimp_drawable_get_buffer(gimp_drawable_get_by_id(layer_ID));
+    gegl_buffer_get(buffer_in, GEGL_RECTANGLE (0, 0, w, h), 1.0,
+                    babl_format("R'G'B'A u8"), buffer,
+                    GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
+    g_object_unref(buffer_in);
 
     return buffer;
 }
@@ -68,7 +108,7 @@ LqrRetVal
 update_bias(LqrCarver *r, gint32 layer_ID, gint bias_factor,
             gint base_x_off, gint base_y_off) {
     guchar *rgb;
-    gint w, h, bpp;
+    gint w, h;
     gint x_off, y_off;
 
     if ((layer_ID == 0) || (bias_factor == 0)) {
@@ -82,12 +122,11 @@ update_bias(LqrCarver *r, gint32 layer_ID, gint bias_factor,
     w = gimp_drawable_get_width_id(layer_ID);
     h = gimp_drawable_get_height_id(layer_ID);
 
-    bpp = gimp_drawable_bpp_id(layer_ID);
-
-    rgb = rgb_buffer_from_layer(layer_ID);
+    rgb = mask_buffer_from_layer(layer_ID);
+    CATCH_MEM (rgb);
 
     CATCH (lqr_carver_bias_add_rgb_area
-                   (r, rgb, bias_factor, bpp, w, h, x_off, y_off));
+                   (r, rgb, bias_factor, MASK_CHANNELS, w, h, x_off, y_off));
 
     g_free(rgb);
 
@@ -97,7 +136,7 @@ update_bias(LqrCarver *r, gint32 layer_ID, gint bias_factor,
 LqrRetVal
 set_rigmask(LqrCarver *r, gint32 layer_ID, gint base_x_off, gint base_y_off) {
     guchar *rgb;
-    gint w, h, bpp;
+    gint w, h;
     gint x_off, y_off;
 
     if (layer_ID == 0) {
@@ -111,12 +150,11 @@ set_rigmask(LqrCarver *r, gint32 layer_ID, gint base_x_off, gint base_y_off) {
     w = gimp_drawable_get_width_id(layer_ID);
     h = gimp_drawable_get_height_id(layer_ID);
 
-    bpp = gimp_drawable_bpp_id(layer_ID);
-
-    rgb = rgb_buffer_from_layer(layer_ID);
+    rgb = mask_buffer_from_layer(layer_ID);
+    CATCH_MEM (rgb);
 
     CATCH (lqr_carver_rigmask_add_rgb_area
-                   (r, rgb, bpp, w, h, x_off, y_off));
+                   (r, rgb, MASK_CHANNELS, w, h, x_off, y_off));
 
     g_free(rgb);
 
@@ -129,8 +167,9 @@ write_carver_to_layer(LqrCarver *r, gint32 layer_ID) {
     GeglBuffer *buffer_out;
     gint y;
     gint w, h;
-    guchar *out_line;
+    void *out_line;
     gint update_step;
+    const Babl *format = layer_pixel_format(layer_ID);
 
     gimp_progress_init(_("Applying changes..."));
     update_step = MAX ((lqr_carver_get_height(r) - 1) / 20, 1);
@@ -141,11 +180,11 @@ write_carver_to_layer(LqrCarver *r, gint32 layer_ID) {
     buffer_out = gimp_drawable_get_buffer(GIMP_DRAWABLE(gimp_drawable_get_by_id(layer_ID)));
 
 
-    while (lqr_carver_scan_line(r, &y, &out_line)) {
+    while (lqr_carver_scan_line_ext(r, &y, &out_line)) {
         if (lqr_carver_scan_by_row(r)) {
-            gegl_buffer_set(buffer_out, GEGL_RECTANGLE (0, y, w, 1), 0, NULL, out_line, GEGL_AUTO_ROWSTRIDE);
+            gegl_buffer_set(buffer_out, GEGL_RECTANGLE (0, y, w, 1), 0, format, out_line, GEGL_AUTO_ROWSTRIDE);
         } else {
-            gegl_buffer_set(buffer_out, GEGL_RECTANGLE (y, 0, 1, h), 0, NULL, out_line, GEGL_AUTO_ROWSTRIDE);
+            gegl_buffer_set(buffer_out, GEGL_RECTANGLE (y, 0, 1, h), 0, format, out_line, GEGL_AUTO_ROWSTRIDE);
         }
 
         if (y % update_step == 0) {
@@ -232,8 +271,8 @@ write_vmap_to_layer(LqrVMap *vmap, gpointer data) {
             } else {
                 value = (double) (depth + 1 - vs) / (depth + 1);
                 gdouble start_rgba[4], end_rgba[4];
-                gegl_color_get_rgba(col_start, &start_rgba[0], &start_rgba[1], &start_rgba[2], &start_rgba[3]);
-                gegl_color_get_rgba(col_end, &end_rgba[0], &end_rgba[1], &end_rgba[2], &end_rgba[3]);
+                gegl_color_get_pixel(col_start, babl_format("R'G'B'A double"), start_rgba);
+                gegl_color_get_pixel(col_end, babl_format("R'G'B'A double"), end_rgba);
                 rd = value * start_rgba[0] + (1 - value) * end_rgba[0];
                 gr = value * start_rgba[1] + (1 - value) * end_rgba[1];
                 bl = value * start_rgba[2] + (1 - value) * end_rgba[2];
@@ -244,7 +283,8 @@ write_vmap_to_layer(LqrVMap *vmap, gpointer data) {
                 outrow[x * bpp + 3] = 255 * al;
             }
         }
-        gegl_buffer_set(buffer_out, GEGL_RECTANGLE (0, y, w, 1), 0, NULL, outrow, GEGL_AUTO_ROWSTRIDE);
+        gegl_buffer_set(buffer_out, GEGL_RECTANGLE (0, y, w, 1), 0,
+                        babl_format("R'G'B'A u8"), outrow, GEGL_AUTO_ROWSTRIDE);
         if (y % update_step == 0) {
             gimp_progress_update((gdouble) y / (h - 1));
         }

@@ -46,7 +46,7 @@
 #define MEM_CHECK2(x) if ((x) == FALSE) { g_message(_("Not enough memory")); return FALSE; }
 
 #define BPP_CHECK(layer_ID, carver) G_STMT_START { \
-  if (gimp_drawable_bpp_id(layer_ID) != lqr_carver_get_channels(carver)) \
+  if (layer_channels(layer_ID) != lqr_carver_get_channels(carver)) \
     { \
       g_message(_("Error: number of colour channels changed")); \
       return FALSE; \
@@ -118,7 +118,7 @@ render_init_carver(PlugInImageVals *image_vals,
     gint32 layer_ID;
     gchar layer_name[LQR_MAX_NAME_LENGTH];
     gchar new_layer_name[LQR_MAX_NAME_LENGTH];
-    guchar *rgb_buffer;
+    gfloat *rgb_buffer;
     gboolean alpha_lock;
     gboolean alpha_lock_pres = FALSE, alpha_lock_disc = FALSE, alpha_lock_rigmask = FALSE;
     gfloat rigidity;
@@ -156,7 +156,7 @@ render_init_carver(PlugInImageVals *image_vals,
     old_width = gimp_drawable_get_width_id(layer_ID);
     old_height = gimp_drawable_get_height_id(layer_ID);
     gimp_drawable_get_offsets_id(layer_ID, &x_off, &y_off);
-    bpp = gimp_drawable_bpp_id(layer_ID);
+    bpp = layer_channels(layer_ID);
 
     new_width = vals->new_width;
     new_height = vals->new_height;
@@ -214,9 +214,10 @@ render_init_carver(PlugInImageVals *image_vals,
 #endif /* __CLOCK_IT__ */
 
     /* lqr carver initialization */
-    rgb_buffer = rgb_buffer_from_layer(layer_ID);
+    rgb_buffer = float_buffer_from_layer(layer_ID);
     MEM_CHECK_N (rgb_buffer);
-    carver = lqr_carver_new(rgb_buffer, old_width, old_height, bpp);
+    carver = lqr_carver_new_ext(rgb_buffer, old_width, old_height, bpp,
+                                LQR_COLDEPTH_32F);
     MEM_CHECK_N (carver);
     MEM_CHECK1_N (lqr_carver_init(carver, vals->delta_x, rigidity));
     MEM_CHECK1_N (update_bias
@@ -824,16 +825,17 @@ resize_unlock_aux_layer(gint32 layer_ID, gint width, gint height, gint x_off, gi
 
 static LqrCarver *
 attach_aux_carver(LqrCarver *carver, gint32 layer_ID, gint width, gint height) {
-    guchar *rgb_buffer;
+    gfloat *rgb_buffer;
     LqrCarver *aux_carver;
     gint bpp;
 
     if (layer_ID) {
-        rgb_buffer = rgb_buffer_from_layer(layer_ID);
+        rgb_buffer = float_buffer_from_layer(layer_ID);
         MEM_CHECK_N (rgb_buffer);
-        bpp = gimp_drawable_bpp_id(layer_ID);
+        bpp = layer_channels(layer_ID);
         aux_carver =
-                lqr_carver_new(rgb_buffer, width, height, bpp);
+                lqr_carver_new_ext(rgb_buffer, width, height, bpp,
+                                   LQR_COLDEPTH_32F);
 
         MEM_CHECK_N (aux_carver);
         MEM_CHECK1_N (lqr_carver_attach(carver, aux_carver));

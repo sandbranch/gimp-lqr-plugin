@@ -320,9 +320,10 @@ guess_new_size(GtkWidget *button, PreviewData *p_data, GuessDir direction) {
 
     width = gimp_drawable_get_width_id(disc_layer_ID);
     height = gimp_drawable_get_height_id(disc_layer_ID);
-    has_alpha = gimp_drawable_has_alpha_id(disc_layer_ID);
-    bpp = gimp_drawable_bpp_id(disc_layer_ID);
-    c_bpp = bpp - (has_alpha ? 1 : 0);
+    /* read the mask as 8-bit RGBA whatever its precision and type */
+    has_alpha = TRUE;
+    bpp = 4;
+    c_bpp = 3;
 
     buffer_in = gimp_drawable_get_buffer(GIMP_DRAWABLE(gimp_drawable_get_by_id(disc_layer_ID)));
 
@@ -356,11 +357,11 @@ guess_new_size(GtkWidget *button, PreviewData *p_data, GuessDir direction) {
     for (z1 = z1min; z1 < z1max; z1++) {
         switch (direction) {
             case GUESS_DIR_HOR:
-                gegl_buffer_get(buffer_in, GEGL_RECTANGLE (MAX(0, -x_off), z1 - y_off, z2max, 1), 1.0, NULL, line,
+                gegl_buffer_get(buffer_in, GEGL_RECTANGLE (MAX(0, -x_off), z1 - y_off, z2max, 1), 1.0, babl_format("R'G'B'A u8"), line,
                                 GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
                 break;
             case GUESS_DIR_VERT:
-                gegl_buffer_get(buffer_in, GEGL_RECTANGLE (z1 - x_off, MAX(0, -y_off), 1, z2max), 1.0, NULL, line,
+                gegl_buffer_get(buffer_in, GEGL_RECTANGLE (z1 - x_off, MAX(0, -y_off), 1, z2max), 1.0, babl_format("R'G'B'A u8"), line,
                                 GEGL_AUTO_ROWSTRIDE, GEGL_ABYSS_NONE);
                 break;
         }
