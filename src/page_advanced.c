@@ -18,6 +18,29 @@ extern GtkWidget *res_order_combo_box;
 
 /* Generate advanced options page */
 
+/* A scale entry for one of the settings, packed into box and updating the
+   setting through its adjustment, as the settings on the other pages do. */
+static GtkWidget *
+settings_scale_entry(GtkWidget *box, const gchar *text, gdouble value,
+                     gdouble lower, gdouble upper, gdouble step, gdouble page,
+                     gint digits, const gchar *tip, GCallback update,
+                     gpointer setting) {
+    GtkWidget *entry;
+    GtkWidget *spin_button;
+
+    entry = gimp_scale_entry_new(text, value, lower, upper, digits);
+    gimp_label_spin_set_increments(GIMP_LABEL_SPIN(entry), step, page);
+    gimp_help_set_help_data(entry, tip, NULL);
+    gtk_box_pack_start(GTK_BOX (box), entry, FALSE, FALSE, 0);
+    gtk_widget_show(entry);
+
+    spin_button = gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(entry));
+    g_signal_connect (gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button)),
+                      "value-changed", update, setting);
+
+    return entry;
+}
+
 GtkWidget *
 advanced_page_new(gint32 image_ID, gint32 layer_ID) {
     gint num_extra_layers;
@@ -46,10 +69,9 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
     GtkWidget *rigmask_edit_button;
     GtkWidget *operations_vbox;
     GtkWidget *no_disc_on_enlarge_button;
-    GtkWidget *table;
-    gint row;
+    GtkWidget *rigmask_combo_grid;
+    GtkWidget *rigmask_layer_label;
     GtkWidget *combo;
-    GtkAdjustment *adj;
 
     GtkWidget *nrg_event_box;
     GtkWidget *res_order_event_box;
@@ -123,86 +145,22 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
     gtk_container_add(GTK_CONTAINER (seams_control_expander), rigmask_vbox);
     gtk_widget_show(rigmask_vbox);
 
-    table = gtk_table_new(3, 2, FALSE);
-    gtk_container_set_border_width(GTK_CONTAINER (table), 4);
-    gtk_table_set_col_spacings(GTK_TABLE (table), 4);
-    gtk_table_set_row_spacings(GTK_TABLE (table), 2);
-    gtk_box_pack_start(GTK_BOX (rigmask_vbox), table, FALSE, FALSE, 0);
-    gtk_widget_show(table);
-
-    row = 0;
-
     /* Delta x */
-
-//    adj = gimp_scale_entry_new(GTK_TABLE (table), 0, row++,
-//                               _("Max transversal step:"),
-//                               SCALE_WIDTH,
-//                               SPIN_BUTTON_WIDTH,
-//                               state->delta_x,
-//                               0,
-//                               MAX_DELTA_X,
-//                               1,
-//                               1,
-//                               0,
-//                               TRUE,
-//                               0,
-//                               0,
-//                               _("Maximum displacement along a seam. "
-//                                 "Increasing this value allows to overcome "
-//                                 "the 45 degrees bound"), NULL);
-
-    GtkWidget *scale_entry_max_traversal_step;
-    GtkAdjustment *scale_entry_adj_max_traversal_step;
-
-    scale_entry_max_traversal_step = gimp_scale_entry_new(_("Max transversal step:"),    // label text
-                                                          state->disc_coeff, // initial value
-                                                          0,                 // lower bound
-                                                          MAX_COEFF,         // upper bound
-//                                       1,                 // step increment
-//                                       10,                // page increment
-                                                          0                // digits
-    );
-
-    g_signal_connect (scale_entry_max_traversal_step, "value-changed",
-                      G_CALLBACK(gimp_int_adjustment_update), &state->delta_x);
+    settings_scale_entry(rigmask_vbox, _("Max transversal step:"),
+                         state->delta_x, 0, MAX_DELTA_X, 1, 1, 0,
+                         _("Maximum displacement along a seam. "
+                           "Increasing this value allows to overcome "
+                           "the 45 degrees bound"),
+                         G_CALLBACK (gimp_int_adjustment_update),
+                         &state->delta_x);
 
     /* Rigidity */
-
-//    adj = gimp_scale_entry_new(GTK_TABLE (table),
-//                               0,
-//                               row++,
-//                               _("Overall rigidity:"),
-//                               SCALE_WIDTH,
-//                               SPIN_BUTTON_WIDTH,
-//                               state->rigidity,
-//                               0,
-//                               MAX_RIGIDITY,
-//                               0.2,
-//                               10,
-//                               2,
-//                               TRUE,
-//                               0,
-//                               0,
-//                               _("Increasing this value results "
-//                                 "in straighter seams"),
-//                                 NULL);
-
-    GtkWidget *scale_entry_overall_rigidity;
-    GtkAdjustment *scale_entry_adj_overall_rigidity;
-
-    scale_entry_overall_rigidity = gimp_scale_entry_new(_("Overall rigidity:"),    // label text
-                                                        state->rigidity, // initial value
-                                                        0,                 // lower bound
-                                                        MAX_RIGIDITY,         // upper bound
-//                                       1,                 // step increment
-//                                       10,                // page increment
-                                                        0                // digits
-    );
-
-    g_signal_connect (scale_entry_overall_rigidity, "value-changed",
-                      G_CALLBACK(gimp_float_adjustment_update),
-                      &state->rigidity);
-
+    settings_scale_entry(rigmask_vbox, _("Overall rigidity:"),
+                         state->rigidity, 0, MAX_RIGIDITY, 0.2, 10, 2,
+                         _("Increasing this value results "
+                           "in straighter seams"),
+                         G_CALLBACK (gimp_float_adjustment_update),
+                         &state->rigidity);
 
     hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
     gtk_box_pack_start(GTK_BOX (rigmask_vbox), hbox, FALSE, FALSE, 0);
@@ -334,14 +292,12 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
                                 NULL);
     }
 
-    table = gtk_table_new(1, 2, FALSE);
-    gtk_container_set_border_width(GTK_CONTAINER (table), 4);
-    gtk_table_set_col_spacings(GTK_TABLE (table), 4);
-    gtk_table_set_row_spacings(GTK_TABLE (table), 2);
-    gtk_container_add(GTK_CONTAINER (rigmask_combo_event_box), table);
-    gtk_widget_show(table);
-
-    row = 0;
+    rigmask_combo_grid = gtk_grid_new();
+    gtk_container_set_border_width(GTK_CONTAINER (rigmask_combo_grid), 4);
+    gtk_grid_set_column_spacing(GTK_GRID (rigmask_combo_grid), 4);
+    gtk_grid_set_row_spacing(GTK_GRID (rigmask_combo_grid), 2);
+    gtk_container_add(GTK_CONTAINER (rigmask_combo_event_box), rigmask_combo_grid);
+    gtk_widget_show(rigmask_combo_grid);
 
     combo =
             gimp_layer_combo_box_new(dialog_layer_constraint_func,
@@ -360,15 +316,16 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
 
     gimp_int_combo_box_set_active(GIMP_INT_COMBO_BOX(combo), old_layer_ID);
 
-//    label = gimp_table_attach_aligned(GTK_TABLE (table), 0, row++,
-//                                      _("Layer:"), 0.0, 0.5, combo, 1, FALSE);
+    rigmask_layer_label = gtk_label_new(_("Layer:"));
+    gtk_widget_set_halign(rigmask_layer_label, GTK_ALIGN_START);
+    gtk_widget_set_valign(rigmask_layer_label, GTK_ALIGN_CENTER);
+    gtk_grid_attach(GTK_GRID(rigmask_combo_grid), rigmask_layer_label, 0, 0, 1, 1);
+    gtk_grid_attach(GTK_GRID(rigmask_combo_grid), combo, 1, 0, 1, 1);
+    gtk_widget_set_hexpand(combo, TRUE);
+    gtk_widget_show(rigmask_layer_label);
 
-// @TODO fix grid attach
-//    gtk_grid_attach(GTK_GRID(grid), widget, column, row, width, height);
-
-
-    gtk_widget_set_sensitive(label, ui_state->rigmask_status
-                                    && features_are_sensitive);
+    gtk_widget_set_sensitive(rigmask_layer_label, ui_state->rigmask_status
+                                                  && features_are_sensitive);
 
     gtk_widget_set_sensitive(combo, ui_state->rigmask_status
                                     && features_are_sensitive);
@@ -377,7 +334,7 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
                                                   && features_are_sensitive);
 
     rigmask_toggle_data.combo = combo;
-    rigmask_toggle_data.combo_label = label;
+    rigmask_toggle_data.combo_label = rigmask_layer_label;
     rigmask_toggle_data.edit_button = rigmask_edit_button;
     preview_data.rigmask_combo = combo;
 
@@ -457,43 +414,12 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
 
     /* Enlargement step */
 
-    table = gtk_table_new(3, 1, FALSE);
-    gtk_container_set_border_width(GTK_CONTAINER (table), 4);
-    gtk_table_set_col_spacings(GTK_TABLE (table), 4);
-    gtk_table_set_row_spacings(GTK_TABLE (table), 2);
-    gtk_box_pack_start(GTK_BOX (operations_vbox), table, FALSE, FALSE, 0);
-    gtk_widget_show(table);
-
-    row = 0;
-
-//    adj = gimp_scale_entry_new(GTK_TABLE (table), 0, row++,
-//                               _("Max enlargement per step:"), SCALE_WIDTH,
-//                               SPIN_BUTTON_WIDTH, state->enl_step, 100.1,
-//                               200, 1, 10, 1, TRUE, 0, 0,
-//                               _("When enlarging beyond the value set here "
-//                                 "the rescaling will be performed in multiple steps."), NULL);
-
-    // GIMP 3.x - New way using GimpScaleEntry with GtkGrid
-    GtkWidget *scale_entry_max_enlargement;
-    GtkAdjustment *adj_max_enlargement;;
-
-// Create the scale entry widget
-    scale_entry_max_enlargement = gimp_scale_entry_new(_("Max enlargement per step:"),
-                                                       state->disc_coeff, // initial value
-                                                       0,                 // lower bound
-                                                       MAX_COEFF,         // upper bound
-//                                       1,                 // step increment
-//                                       10,                // page increment
-                                                       0);                // digits
-
-    GtkWidget *spin_button = gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(scale_entry_max_enlargement));
-    adj_max_enlargement = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button));
-    gtk_widget_set_tooltip_text(scale_entry_max_enlargement,
-                                _("When enlarging beyond the value set here the rescaling will be performed in multiple steps."));
-
-    g_signal_connect (adj_max_enlargement, "value-changed",
-                      G_CALLBACK(gimp_float_adjustment_update),
-                      &state->enl_step);
+    settings_scale_entry(operations_vbox, _("Max enlargement per step:"),
+                         state->enl_step, 100.1, 200, 1, 10, 1,
+                         _("When enlarging beyond the value set here the "
+                           "rescaling will be performed in multiple steps."),
+                         G_CALLBACK (gimp_float_adjustment_update),
+                         &state->enl_step);
 
     /* Resize order */
 
