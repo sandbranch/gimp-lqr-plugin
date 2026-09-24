@@ -275,7 +275,7 @@ alt_size_entry_new(gint number_of_fields,
                 (update_policy == ALT_SIZE_ENTRY_UPDATE_SIZE) ? 0 : 3;
         gsef->stop_recursion = 0;
 
-        digits = ((unit == GIMP_UNIT_PIXEL) ?
+        digits = ((unit == gimp_unit_pixel()) ?
                   gsef->refval_digits : ((unit == gimp_unit_percent()) ?
                                          2 : ALT_SIZE_ENTRY_DIGITS (unit)));
 
@@ -320,7 +320,7 @@ alt_size_entry_new(gint number_of_fields,
             gtk_widget_show(gsef->refval_spinbutton);
         }
 
-        if (gse->menu_show_pixels && (unit == GIMP_UNIT_PIXEL) &&
+        if (gse->menu_show_pixels && (unit == gimp_unit_pixel()) &&
             !gse->show_refval)
             gtk_spin_button_set_digits(GTK_SPIN_BUTTON (gsef->value_spinbutton),
                                        gsef->refval_digits);
@@ -430,7 +430,7 @@ alt_size_entry_add_field(AltSizeEntry *gse,
 
     if (gse->menu_show_pixels &&
         !gse->show_refval &&
-        (gse->unit == GIMP_UNIT_PIXEL)) {
+        (gse->unit == gimp_unit_pixel())) {
         gtk_spin_button_set_digits(GTK_SPIN_BUTTON (gsef->value_spinbutton),
                                    gsef->refval_digits);
     }
@@ -910,7 +910,7 @@ alt_size_entry_set_refval_digits(AltSizeEntry *gse,
         if (gse->show_refval)
             gtk_spin_button_set_digits(GTK_SPIN_BUTTON (gsef->refval_spinbutton),
                                        gsef->refval_digits);
-        else if (gse->unit == GIMP_UNIT_PIXEL)
+        else if (gse->unit == gimp_unit_pixel())
             gtk_spin_button_set_digits(GTK_SPIN_BUTTON (gsef->value_spinbutton),
                                        gsef->refval_digits);
     }
@@ -1064,15 +1064,15 @@ alt_size_entry_update_unit(AltSizeEntry *gse,
 
     gse->unit = unit;
 
-    //@TODO migrate
-    //digits = gimp_unit_menu_get_pixel_digits(GIMP_UNIT_MENU(gse->unitmenu));
-    digits = 2;
+    /* the extra digits for pixels, which the unit store of the menu is
+       created with (GIMP 2 read them from its unit menu, default 0) */
+    digits = 0;
 
     for (i = 0; i < gse->number_of_fields; i++) {
         gsef = (AltSizeEntryField *) g_slist_nth_data(gse->fields, i);
 
         if (gse->update_policy == ALT_SIZE_ENTRY_UPDATE_SIZE) {
-            if (unit == GIMP_UNIT_PIXEL)
+            if (unit == gimp_unit_pixel())
                 gtk_spin_button_set_digits(GTK_SPIN_BUTTON (gsef->value_spinbutton),
                                            gsef->refval_digits + digits);
             else if (unit == gimp_unit_percent())
