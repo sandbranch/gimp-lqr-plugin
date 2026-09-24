@@ -35,6 +35,12 @@ settings_scale_entry(GtkWidget *box, const gchar *text, gdouble value,
     gtk_widget_show(entry);
 
     spin_button = gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(entry));
+    /* the initial value of a GimpScaleEntry does not reach its spin button
+       and scale here, which then show and report 0, so set it there too */
+    gtk_adjustment_set_value(gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button)),
+                             value);
+    gtk_range_set_value(GTK_RANGE (gimp_scale_entry_get_range(GIMP_SCALE_ENTRY (entry))),
+                        value);
     g_signal_connect (gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button)),
                       "value-changed", update, setting);
 

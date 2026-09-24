@@ -321,6 +321,11 @@ features_page_new(gint32 image_ID, gint32 layer_ID) {
             gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(pres_coeff_scale_entry));
     pres_coeff_adj =
             gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(pres_coeff_spin_button));
+    /* the initial value of a GimpScaleEntry does not reach its spin button
+       and scale here, which then show and report 0, so set it there too */
+    gtk_adjustment_set_value(pres_coeff_adj, state->pres_coeff);
+    gtk_range_set_value(GTK_RANGE (gimp_scale_entry_get_range(GIMP_SCALE_ENTRY (pres_coeff_scale_entry))),
+                        state->pres_coeff);
 
     gtk_widget_set_tooltip_text(pres_coeff_scale_entry, pres_strength_tip_string);
     gtk_box_pack_start(GTK_BOX (pres_vbox2), pres_coeff_scale_entry, FALSE, FALSE, 0);
@@ -568,6 +573,11 @@ features_page_new(gint32 image_ID, gint32 layer_ID) {
     GtkWidget *disc_coeff_spin_button =
             gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(disc_coeff_scale_entry));
     disc_coeff_adj = gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(disc_coeff_spin_button));
+    /* the initial value of a GimpScaleEntry does not reach its spin button
+       and scale here, which then show and report 0, so set it there too */
+    gtk_adjustment_set_value(disc_coeff_adj, state->disc_coeff);
+    gtk_range_set_value(GTK_RANGE (gimp_scale_entry_get_range(GIMP_SCALE_ENTRY (disc_coeff_scale_entry))),
+                        state->disc_coeff);
 
 // Set tooltip if needed
     gtk_widget_set_tooltip_text(disc_coeff_scale_entry, disc_strength_tip_string);
