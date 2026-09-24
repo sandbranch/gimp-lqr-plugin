@@ -18,31 +18,29 @@ extern GtkWidget *res_order_combo_box;
 
 /* Generate advanced options page */
 
-/* A scale entry for one of the settings, packed into box and updating the
-   setting through its adjustment, as the settings on the other pages do. */
+/* A label and spin button for one of the settings, packed into box and
+   updating the setting through its adjustment, as the settings on the other
+   pages do. The page is too narrow for a useful scale next to the label. */
 static GtkWidget *
-settings_scale_entry(GtkWidget *box, const gchar *text, gdouble value,
-                     gdouble lower, gdouble upper, gdouble step, gdouble page,
-                     gint digits, const gchar *tip, GCallback update,
-                     gpointer setting) {
+settings_spin(GtkWidget *box, const gchar *text, gdouble value,
+              gdouble lower, gdouble upper, gdouble step, gdouble page,
+              gint digits, const gchar *tip, GCallback update,
+              gpointer setting) {
     GtkWidget *entry;
-    GtkWidget *spin_button;
+    GtkAdjustment *adjustment;
 
-    entry = gimp_scale_entry_new(text, value, lower, upper, digits);
+    entry = gimp_label_spin_new(text, value, lower, upper, digits);
     gimp_label_spin_set_increments(GIMP_LABEL_SPIN(entry), step, page);
     gimp_help_set_help_data(entry, tip, NULL);
     gtk_box_pack_start(GTK_BOX (box), entry, FALSE, FALSE, 0);
     gtk_widget_show(entry);
 
-    spin_button = gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(entry));
-    /* the initial value of a GimpScaleEntry does not reach its spin button
-       and scale here, which then show and report 0, so set it there too */
-    gtk_adjustment_set_value(gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button)),
-                             value);
-    gtk_range_set_value(GTK_RANGE (gimp_scale_entry_get_range(GIMP_SCALE_ENTRY (entry))),
-                        value);
-    g_signal_connect (gtk_spin_button_get_adjustment(GTK_SPIN_BUTTON(spin_button)),
-                      "value-changed", update, setting);
+    adjustment = gtk_spin_button_get_adjustment
+            (GTK_SPIN_BUTTON(gimp_label_spin_get_spin_button(GIMP_LABEL_SPIN(entry))));
+    /* the initial value of a GimpLabelSpin does not reach its spin button
+       here, which then shows and reports 0, so set it there too */
+    gtk_adjustment_set_value(adjustment, value);
+    g_signal_connect (adjustment, "value-changed", update, setting);
 
     return entry;
 }
@@ -152,21 +150,21 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
     gtk_widget_show(rigmask_vbox);
 
     /* Delta x */
-    settings_scale_entry(rigmask_vbox, _("Max transversal step:"),
-                         state->delta_x, 0, MAX_DELTA_X, 1, 1, 0,
-                         _("Maximum displacement along a seam. "
-                           "Increasing this value allows to overcome "
-                           "the 45 degrees bound"),
-                         G_CALLBACK (gimp_int_adjustment_update),
-                         &state->delta_x);
+    settings_spin(rigmask_vbox, _("Max transversal step:"),
+                  state->delta_x, 0, MAX_DELTA_X, 1, 1, 0,
+                  _("Maximum displacement along a seam. "
+                    "Increasing this value allows to overcome "
+                    "the 45 degrees bound"),
+                  G_CALLBACK (gimp_int_adjustment_update),
+                  &state->delta_x);
 
     /* Rigidity */
-    settings_scale_entry(rigmask_vbox, _("Overall rigidity:"),
-                         state->rigidity, 0, MAX_RIGIDITY, 0.2, 10, 2,
-                         _("Increasing this value results "
-                           "in straighter seams"),
-                         G_CALLBACK (gimp_float_adjustment_update),
-                         &state->rigidity);
+    settings_spin(rigmask_vbox, _("Overall rigidity:"),
+                  state->rigidity, 0, MAX_RIGIDITY, 0.2, 10, 2,
+                  _("Increasing this value results "
+                    "in straighter seams"),
+                  G_CALLBACK (gimp_float_adjustment_update),
+                  &state->rigidity);
 
     hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 4);
     gtk_box_pack_start(GTK_BOX (rigmask_vbox), hbox, FALSE, FALSE, 0);
@@ -420,12 +418,12 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
 
     /* Enlargement step */
 
-    settings_scale_entry(operations_vbox, _("Max enlargement per step:"),
-                         state->enl_step, 100.1, 200, 1, 10, 1,
-                         _("When enlarging beyond the value set here the "
-                           "rescaling will be performed in multiple steps."),
-                         G_CALLBACK (gimp_float_adjustment_update),
-                         &state->enl_step);
+    settings_spin(operations_vbox, _("Max enlargement per step:"),
+                  state->enl_step, 100.1, 200, 1, 10, 1,
+                  _("When enlarging beyond the value set here the "
+                    "rescaling will be performed in multiple steps."),
+                  G_CALLBACK (gimp_float_adjustment_update),
+                  &state->enl_step);
 
     /* Resize order */
 
