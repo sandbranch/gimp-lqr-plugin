@@ -120,7 +120,7 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
 
     scrollwindow = gtk_scrolled_window_new(NULL, NULL);
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW (scrollwindow), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC);
-    gtk_scrolled_window_add_with_viewport(GTK_SCROLLED_WINDOW (scrollwindow), thispage);
+    gtk_container_add(GTK_CONTAINER (scrollwindow), thispage);
 
     notebook_data->advanced_page = scrollwindow;
 
@@ -223,7 +223,7 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
     gtk_container_add(GTK_CONTAINER(rigmask_edit_button), edit_hbox);
     gtk_widget_show(edit_hbox);
 
-    edit_icon = gtk_image_new_from_stock(GTK_STOCK_EDIT, GTK_ICON_SIZE_MENU);
+    edit_icon = gtk_image_new_from_icon_name("document-edit", GTK_ICON_SIZE_MENU);
     gtk_box_pack_start(GTK_BOX(edit_hbox), edit_icon, TRUE, TRUE, 0);
     gtk_widget_show(edit_icon);
     edit_label = gtk_label_new(_("Edit"));
@@ -242,7 +242,7 @@ advanced_page_new(gint32 image_ID, gint32 layer_ID) {
     gtk_container_add(GTK_CONTAINER(rigmask_new_button), new_hbox);
     gtk_widget_show(new_hbox);
 
-    new_icon = gtk_image_new_from_stock(GTK_STOCK_NEW, GTK_ICON_SIZE_MENU);
+    new_icon = gtk_image_new_from_icon_name("document-new", GTK_ICON_SIZE_MENU);
     gtk_box_pack_start(GTK_BOX(new_hbox), new_icon, TRUE, TRUE, 0);
     gtk_widget_show(new_icon);
     new_label = gtk_label_new(_("New"));

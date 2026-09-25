@@ -157,8 +157,8 @@ dialog_I(
 
     dlg = gtk_dialog_new_with_buttons(_("GIMP LiquidRescale Plug-In"),
                                       NULL, 0,
-                                      GTK_STOCK_GO_BACK, RESPONSE_NONINTERACTIVE,
-                                      GTK_STOCK_CLOSE, GTK_RESPONSE_OK, NULL);
+                                      _("_Back"), RESPONSE_NONINTERACTIVE,
+                                      _("_Close"), GTK_RESPONSE_OK, NULL);
 
     gtk_window_set_resizable(GTK_WINDOW (dlg), FALSE);
 
@@ -333,7 +333,7 @@ dialog_I(
 
     show_info_button = gtk_toggle_button_new();
     show_info_icon =
-            gtk_image_new_from_stock(GTK_STOCK_INFO, GTK_ICON_SIZE_MENU);
+            gtk_image_new_from_icon_name("dialog-information", GTK_ICON_SIZE_MENU);
     gtk_container_add(GTK_CONTAINER (show_info_button), show_info_icon);
     gtk_widget_show(show_info_icon);
     gtk_container_add(GTK_CONTAINER (show_info_event_box),

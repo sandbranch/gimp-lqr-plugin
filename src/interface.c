@@ -519,7 +519,7 @@ dialog(
 
     lastvalues_button = gtk_button_new();
     lastvalues_icon =
-            gtk_image_new_from_stock(GTK_STOCK_REVERT_TO_SAVED, GTK_ICON_SIZE_MENU);
+            gtk_image_new_from_icon_name("document-revert", GTK_ICON_SIZE_MENU);
 
     gtk_container_add(GTK_CONTAINER (lastvalues_button), lastvalues_icon);
     gtk_widget_show(lastvalues_icon);
@@ -554,7 +554,7 @@ dialog(
     gtk_container_add(GTK_CONTAINER (interactive_button), interactive_hbox);
     gtk_widget_show(interactive_hbox);
     interactive_icon =
-            gtk_image_new_from_stock(GTK_STOCK_EXECUTE, GTK_ICON_SIZE_LARGE_TOOLBAR);
+            gtk_image_new_from_icon_name("system-run", GTK_ICON_SIZE_LARGE_TOOLBAR);
     gtk_box_pack_start(GTK_BOX(interactive_hbox), interactive_icon, TRUE, FALSE, 0);
     gtk_widget_show(interactive_icon);
     interactive_label = gtk_label_new_with_mnemonic(_("_Interactive"));
