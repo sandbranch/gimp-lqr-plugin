@@ -9,3 +9,9 @@ option('gimp_plugin_datadir',
   value : '',
   description : 'Override plugin data installation directory'
 )
+
+option('bundled_liblqr',
+  type : 'feature',
+  value : 'auto',
+  description : 'Build liblqr from source and link it in: auto uses the system library if there is one'
+)

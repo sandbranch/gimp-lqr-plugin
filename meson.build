@@ -23,7 +23,17 @@ add_project_arguments(
 gimp_required_version = '>= 3.0.0'
 gimp_dep = dependency('gimp-3.0', version : gimp_required_version)
 gimpui_dep = dependency('gimpui-3.0', version : gimp_required_version)
-lqr_dep = dependency('lqr-1', version : '>= 0.4.0')
+# liblqr: the system library, or built from source and linked in, which
+# makes the plug-in independent of the system (e.g. in Flatpak)
+if get_option('bundled_liblqr').enabled()
+  lqr_dep = subproject('liblqr').get_variable('liblqr_dep')
+else
+  lqr_dep = dependency('lqr-1', version : '>= 0.4.0',
+                       required : get_option('bundled_liblqr').disabled())
+  if not lqr_dep.found()
+    lqr_dep = subproject('liblqr').get_variable('liblqr_dep')
+  endif
+endif
 # liblqr uses libm, which its pkg-config file does not name for static builds
 math_dep = cc.find_library('m', required : false)
 

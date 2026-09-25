@@ -25,3 +25,6 @@ po/stamp-it
 po/Makefile.in
 /.cache/
 /_install/
+build/
+subprojects/liblqr/
+subprojects/.wraplock
