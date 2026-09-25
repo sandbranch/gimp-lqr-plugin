@@ -1,6 +1,6 @@
 project('gimp-lqr-plugin', 'c',
   version : '0.8.0git',
-  license : 'GPL-3.0-or-later',
+  license : 'GPL-2.0-or-later',
   meson_version : '>= 0.51.0',
   default_options : [
     'c_std=c99',
@@ -12,12 +12,7 @@ project('gimp-lqr-plugin', 'c',
 plugin_version = meson.project_version()
 plugin_name = meson.project_name()
 
-# Compiler flags
 cc = meson.get_compiler('c')
-add_project_arguments(
-  '-DDEBUG',
-  language : 'c'
-)
 
 # Dependencies
 gimp_required_version = '>= 3.0.0'
