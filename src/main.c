@@ -134,6 +134,17 @@ lqr_plugin_init(LqrPlugin *lqr) {
 
 static GList *
 lqr_query_procedures(GimpPlugIn *plug_in) {
+    /* the manual, installed next to the plug-in as help/<language> */
+    gchar *dir = g_path_get_dirname(gimp_get_progname());
+    gchar *help = g_build_filename(dir, "help", NULL);
+    GFile *help_file = g_file_new_for_path(help);
+
+    gimp_plug_in_set_help_domain(plug_in, "plug-in-lqr-help", help_file);
+
+    g_object_unref(help_file);
+    g_free(help);
+    g_free(dir);
+
     return g_list_append(NULL, g_strdup (PLUG_IN_NAME));
 }
 
