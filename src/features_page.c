@@ -73,7 +73,7 @@ features_page_new(gint32 image_ID, gint32 layer_ID) {
     /* The name of a newly created layer for preservation */
     /* (here "%s" represents the selected layer's name) */
     g_snprintf(new_pres_layer_data->name, LQR_MAX_NAME_LENGTH, _("%s pres mask"),
-               gimp_item_get_name(gimp_item_get_by_id(preview_data.orig_layer_ID)));
+               item_get_name(gimp_item_get_by_id(preview_data.orig_layer_ID)));
 
     new_pres_layer_data->colour = gegl_color_new("black");
     gegl_color_set_rgba(new_pres_layer_data->colour, 0.0, 1.0, 0.0, 1.0);
@@ -85,7 +85,7 @@ features_page_new(gint32 image_ID, gint32 layer_ID) {
     /* The name of a newly created layer for discard */
     /* (here "%s" represents the selected layer's name) */
     g_snprintf(new_disc_layer_data->name, LQR_MAX_NAME_LENGTH, _("%s disc mask"),
-               gimp_item_get_name(gimp_item_get_by_id(preview_data.orig_layer_ID)));
+               item_get_name(gimp_item_get_by_id(preview_data.orig_layer_ID)));
     new_disc_layer_data->colour = gegl_color_new("black");
     gegl_color_set_rgba(new_disc_layer_data->colour, 1.0, 0.0, 0.0, 1.0);
     new_disc_layer_data->layer_type = AUX_LAYER_DISC;

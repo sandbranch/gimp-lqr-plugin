@@ -605,7 +605,7 @@ layer_from_name(gint32 image_ID, gchar *name) {
         return 0;
 
     for (i = 0; layers[i] != NULL; i++) {
-        if (strncmp(name, gimp_item_get_name(GIMP_ITEM(layers[i])), VALS_MAX_NAME_LENGTH) == 0) {
+        if (strncmp(name, item_get_name(GIMP_ITEM(layers[i])), VALS_MAX_NAME_LENGTH) == 0) {
             gint32 layer_id = gimp_item_get_id(GIMP_ITEM(layers[i]));
             g_free(layers);
             return layer_id;
@@ -620,7 +620,7 @@ set_aux_layer_name(GimpLayer *layer, gboolean status, gchar *name) {
     if ((layer == NULL) || (status == FALSE)) {
         name[0] = '\0';
     } else {
-        g_strlcpy(name, gimp_item_get_name(GIMP_ITEM(layer)), VALS_MAX_NAME_LENGTH);
+        g_strlcpy(name, item_get_name(GIMP_ITEM(layer)), VALS_MAX_NAME_LENGTH);
     }
 }
 

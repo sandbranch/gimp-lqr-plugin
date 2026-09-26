@@ -110,6 +110,16 @@ gimp_image_get_layers_id(gint32 image_id, gint *num_layers) {
     return layer_ids;
 }
 
+/* gimp_item_get_name() returns a new string in GIMP 3; the item keeps it,
+   until the next call for the same item */
+static inline const gchar *
+item_get_name(GimpItem *item) {
+    gchar *name = gimp_item_get_name(item);
+
+    g_object_set_data_full(G_OBJECT(item), "lqr-plugin-name", name, g_free);
+    return name;
+}
+
 // Wrapper functions for ID-based calls
 static inline gint
 gimp_drawable_get_width_id(gint32 drawable_id) {
@@ -127,7 +137,7 @@ gimp_drawable_get_height_id(gint32 drawable_id) {
 static inline const gchar *
 gimp_drawable_get_name_id(gint32 drawable_id) {
     GimpDrawable *drawable = gimp_drawable_get_by_id(drawable_id);
-    return gimp_item_get_name(GIMP_ITEM(drawable));
+    return item_get_name(GIMP_ITEM(drawable));
 }
 
 static inline const gchar *
@@ -144,7 +154,7 @@ gimp_item_get_name_id(gint32 item_id) {
         if (channel) item = GIMP_ITEM(channel);
     }
 
-    return item ? gimp_item_get_name(item) : "Unknown";
+    return item ? item_get_name(item) : "Unknown";
 }
 
 static inline GdkPixbuf*
