@@ -73,6 +73,11 @@ dialog_layer_constraint_func(
         return FALSE;
     }
 
+    /* the pixels of a layer group cannot be written */
+    if (gimp_item_is_group(item)) {
+        return FALSE;
+    }
+
     return TRUE;
 }
 

@@ -365,8 +365,6 @@ render_noninteractive(PlugInVals *vals,
         MEM_CHECK2 (write_aux_carver(&carver_list, vals->rigmask_layer_ID, new_width, new_height));
     }
 
-    lqr_carver_destroy(carver);
-
     if (vals->scaleback) {
         switch (vals->scaleback_mode) {
             case SCALEBACK_MODE_LQRBACK:

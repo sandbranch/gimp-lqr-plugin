@@ -20,6 +20,7 @@
 #include "config.h"
 #include <stdio.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 #include <glib.h>
@@ -44,11 +45,13 @@ static gint32           layer_from_name                    (gint32 image_ID,
 static void             set_aux_layer_name                 (GimpLayer *layer,
                                                             gboolean status,
                                                             gchar *name);
-static void             save_vals                          (void);
-static void             retrieve_vals                      (void);
-static void             retrieve_vals_use_aux_layers_names (gint32 image_ID);
-static void             noninteractive_read_vals           (GimpProcedureConfig *config,
+static gint32           aux_layer_from_config              (GimpLayer *layer,
+                                                            GimpImage *image,
+                                                            gchar *name);
+static void             save_vals                          (GimpProcedureConfig *config);
+static void             read_vals                          (GimpProcedureConfig *config,
                                                             GimpImage *image);
+static const gchar     *unsupported_layer                  (gint32 layer_ID);
 static void             install_custom_signals             (void);
 static void             cancel_work_on_aux_layer           (void);
 static GList           *lqr_query_procedures               (GimpPlugIn *plug_in);
@@ -96,7 +99,6 @@ initialize_default_colors(void) {
 static PlugInVals vals;
 static PlugInImageVals image_vals;
 static PlugInDrawableVals drawable_vals;
-static GimpDrawable *drawable = NULL;
 static PlugInUIVals ui_vals;
 static PlugInColVals col_vals;
 static PlugInDialogVals dialog_vals;
@@ -231,7 +233,7 @@ lqr_create_procedure(GimpPlugIn *plug_in,
         gimp_procedure_add_double_argument(procedure, "rigidity",
                                            "Rigidity coefficient",
                                            "Rigidity coefficient",
-                                           0.0, 100.0, 0.0,
+                                           0.0, 1000.0, 0.0,
                                            G_PARAM_READWRITE);
 
         gimp_procedure_add_layer_argument(procedure, "rigidity_mask_layer",
@@ -248,8 +250,9 @@ lqr_create_procedure(GimpPlugIn *plug_in,
 
         gimp_procedure_add_double_argument(procedure, "enl_step",
                                            "Enlargement step",
-                                           "enlargment step (ratio)",
-                                           1.0, 500.0, 150.0,
+                                           "Maximum enlargement per step, in percent "
+                                           "(liblqr needs more than 100 and at most 200)",
+                                           100.1, 200.0, 150.0,
                                            G_PARAM_READWRITE);
 
         gimp_procedure_add_boolean_argument(procedure, "resize_aux_layers",
@@ -266,7 +269,7 @@ lqr_create_procedure(GimpPlugIn *plug_in,
 
         gimp_procedure_add_int_argument(procedure, "output_target",
                                         "Output target",
-                                        "Output target (same layer, new layer, new image)",
+                                        "Output target (0: same layer, 1: new layer, 2: new image)",
                                         0, 2, 0,
                                         G_PARAM_READWRITE);
 
@@ -278,20 +281,22 @@ lqr_create_procedure(GimpPlugIn *plug_in,
 
         gimp_procedure_add_int_argument(procedure, "nrg_func",
                                         "Energy function",
-                                        "Energy function to use",
-                                        0, 10, 0,
+                                        "Energy function to use (0: gradient norm, 1: sum of absolute "
+                                        "gradients, 2: transversal gradient, 3 to 5: the same with luma, "
+                                        "6: null)",
+                                        LQR_EF_GRAD_NORM, LQR_EF_NULL, LQR_EF_GRAD_XABS,
                                         G_PARAM_READWRITE);
 
         gimp_procedure_add_int_argument(procedure, "res_order",
                                         "Resize order",
-                                        "Resize order",
+                                        "Resize order (0: horizontal first, 1: vertical first)",
                                         0, 1, 0,
                                         G_PARAM_READWRITE);
 
         gimp_procedure_add_int_argument(procedure, "mask_behavior",
                                         "Mask behavior",
-                                        "What to do with masks",
-                                        0, 2, 0,
+                                        "What to do with a layer mask (0: apply, 1: discard)",
+                                        GIMP_MASK_APPLY, GIMP_MASK_DISCARD, GIMP_MASK_APPLY,
                                         G_PARAM_READWRITE);
 
         gimp_procedure_add_boolean_argument(procedure, "scaleback",
@@ -302,8 +307,9 @@ lqr_create_procedure(GimpPlugIn *plug_in,
 
         gimp_procedure_add_int_argument(procedure, "scaleback_mode",
                                         "Scale back mode",
-                                        "Scale back mode",
-                                        0, 1, 0,
+                                        "Scale back mode (0: liquid rescale, 1: standard scaling, "
+                                        "2: width only, 3: height only (uniform scaling))",
+                                        SCALEBACK_MODE_LQRBACK, SCALEBACK_MODE_STDH, SCALEBACK_MODE_LQRBACK,
                                         G_PARAM_READWRITE);
 
         gimp_procedure_add_boolean_argument(procedure, "no_disc_on_enlarge",
@@ -352,9 +358,9 @@ lqr_run(
 ) {
     GimpDrawable *drawable;
 
-    gegl_init (NULL, NULL);
-
     GimpPDBStatusType status = GIMP_PDB_SUCCESS;
+    GError *error = NULL;
+    const gchar *problem;
     gint32 layer_ID;
     gint32 image_ID;
 
@@ -368,54 +374,62 @@ lqr_run(
     /* Initialize default colors */
     initialize_default_colors();
 
-
     /*  Initialize with default values  */
     vals = default_vals;
     image_vals = default_image_vals;
     drawable_vals = default_drawable_vals;
-//    image = gimp_image_get_by_id(image_ID);
-//    drawable = gimp_drawable_get_by_id(layer_ID);
-
     ui_vals = default_ui_vals;
     col_vals = default_col_vals;
     dialog_vals = default_dialog_vals;
 
-
-    /* Get the first drawable (layer) */
-    drawable = drawables[0];
-    layer_ID = gimp_item_get_id(GIMP_ITEM(drawable));
-
-
-    if (!layer_ID) {
-        g_message("Warning: layer_ID is not populated");
-    }
-    image_ID = gimp_image_get_id(image);
-    if (!image_ID) {
-        g_message("Warning: image_ID is not populated");
-    }
-
-    if (gimp_item_is_channel(GIMP_ITEM(drawable))) {
+    /* The first of the selected drawables; for a channel or no drawable,
+       the first selected layer */
+    drawable = (drawables != NULL) ? drawables[0] : NULL;
+    if ((drawable != NULL) && gimp_item_is_channel(GIMP_ITEM(drawable))) {
         gimp_image_unset_active_channel(image);
     }
-    if (!gimp_item_is_layer(GIMP_ITEM(drawable))) {
+    if ((drawable == NULL) || !gimp_item_is_layer(GIMP_ITEM(drawable))) {
         GimpLayer **selected_layers;
+
+        drawable = NULL;
         selected_layers = gimp_image_get_selected_layers(image);
         if (selected_layers && selected_layers[0] != NULL)
-            layer_ID = gimp_item_get_id(GIMP_ITEM(selected_layers[0]));
+            drawable = GIMP_DRAWABLE(selected_layers[0]);
         g_free(selected_layers);
     }
+    if (drawable == NULL) {
+        error = g_error_new_literal(GIMP_PLUG_IN_ERROR, 0, _("No layer to rescale"));
+        return gimp_procedure_new_return_values(procedure, GIMP_PDB_CALLING_ERROR, error);
+    }
 
+    layer_ID = gimp_item_get_id(GIMP_ITEM(drawable));
+    image_ID = gimp_image_get_id(image);
 
     image_vals.image_ID = image_ID;
     drawable_vals.layer_ID = layer_ID;
 
     switch (run_mode) {
         case GIMP_RUN_NONINTERACTIVE:
-            noninteractive_read_vals(config, image);
+        case GIMP_RUN_WITH_LAST_VALS:
+            read_vals(config, image);
+            problem = unsupported_layer(drawable_vals.layer_ID);
+            if (problem) {
+                error = g_error_new_literal(GIMP_PLUG_IN_ERROR, 0, problem);
+                return gimp_procedure_new_return_values(procedure, GIMP_PDB_EXECUTION_ERROR, error);
+            }
             break;
 
         case GIMP_RUN_INTERACTIVE:
-            retrieve_vals();
+            problem = unsupported_layer(drawable_vals.layer_ID);
+            if (problem) {
+                g_message("%s", problem);
+                return gimp_procedure_new_return_values(procedure, GIMP_PDB_EXECUTION_ERROR, NULL);
+            }
+
+            /* the values of the last run, which GIMP keeps in the config */
+            read_vals(config, image);
+            vals.selected_layer_name[0] = '\0';
+            drawable_vals.layer_ID = layer_ID;
 
             install_custom_signals();
 
@@ -458,7 +472,7 @@ lqr_run(
                                 run_render = FALSE;
                                 break;
                             case RESPONSE_NONINTERACTIVE:
-                                save_vals();
+                                save_vals(config);
                                 run_dialog = TRUE;
                                 break;
                             default:
@@ -501,17 +515,16 @@ lqr_run(
             }
             break;
 
-        case GIMP_RUN_WITH_LAST_VALS:
-            retrieve_vals_use_aux_layers_names(image_ID);
-            break;
-
         default:
             break;
     }
 
+    image_ID = image_vals.image_ID;
+    layer_ID = drawable_vals.layer_ID;
+
     if (status == GIMP_PDB_SUCCESS) {
-        // @TODO find migration path for image_ID
-        IMAGE_CHECK (image_ID, NULL);
+        IMAGE_CHECK (image_ID, gimp_procedure_new_return_values(procedure, GIMP_PDB_EXECUTION_ERROR, NULL));
+        image = gimp_image_get_by_id(image_ID);
         AUX_LAYER_STATUS(vals.pres_layer_ID, ui_vals.pres_status);
         AUX_LAYER_STATUS(vals.disc_layer_ID, ui_vals.disc_status);
         AUX_LAYER_STATUS(vals.rigmask_layer_ID, ui_vals.rigmask_status);
@@ -530,14 +543,17 @@ lqr_run(
                     &vals,
                     FALSE);
             if (carver_data) {
-                image = gimp_image_get_by_id(carver_data->image_ID);
-                drawable = gimp_drawable_get_by_id(carver_data->layer_ID);
-                if (image_ID != gimp_image_get_id(image)) {
+                GimpImage *target = gimp_image_get_by_id(carver_data->image_ID);
+
+                /* the output goes to a new image, which has its own undo */
+                if (target != image) {
                     gimp_image_undo_group_end(image);
-                    image_ID = gimp_image_get_id(image);
+                    image = target;
                     gimp_image_undo_group_start(image);
                 }
                 render_success = render_noninteractive(&vals, &col_vals, carver_data);
+                lqr_carver_destroy(carver_data->carver);
+                free(carver_data);
             }
         }
 
@@ -545,14 +561,30 @@ lqr_run(
             gimp_displays_flush();
 
         if ((run_mode == GIMP_RUN_INTERACTIVE) && render_success) {
-            save_vals();
+            save_vals(config);
         }
 
-        // IMAGE_CHECK (image_ID, return gimp_procedure_new_return_values (procedure, GIMP_PDB_EXECUTION_ERROR, NULL));
         gimp_image_undo_group_end(image);
+
+        if (!render_success)
+            status = GIMP_PDB_EXECUTION_ERROR;
     }
 
     return gimp_procedure_new_return_values(procedure, status, NULL);
+}
+
+/* Why the layer cannot be rescaled, or NULL */
+static const gchar *
+unsupported_layer(gint32 layer_ID) {
+    GimpLayer *layer = gimp_layer_get_by_id(layer_ID);
+
+    if (layer == NULL)
+        return _("Error: invalid layer");
+    if (gimp_item_is_group(GIMP_ITEM(layer)))
+        return _("Layer groups cannot be rescaled: select a layer");
+    if (gimp_drawable_is_indexed(GIMP_DRAWABLE(layer)))
+        return _("Indexed images cannot be rescaled: convert the image to RGB or grayscale");
+    return NULL;
 }
 
 static gint32
@@ -592,129 +624,138 @@ set_aux_layer_name(GimpLayer *layer, gboolean status, gchar *name) {
     }
 }
 
+/* An auxiliary layer of the config: the layer itself if it is one of the
+   image, otherwise the layer of the image with the given name, or 0 */
+static gint32
+aux_layer_from_config(GimpLayer *layer, GimpImage *image, gchar *name) {
+    gint32 layer_ID = 0;
+
+    if ((layer != NULL) && (gimp_item_get_image(GIMP_ITEM(layer)) == image)) {
+        layer_ID = gimp_item_get_id(GIMP_ITEM(layer));
+    }
+    if (layer_ID == 0) {
+        layer_ID = layer_from_name(gimp_image_get_id(image), name);
+    }
+    /* the pixels of a layer group cannot be written */
+    if ((layer_ID != 0) && gimp_item_is_group(GIMP_ITEM(gimp_layer_get_by_id(layer_ID)))) {
+        layer_ID = 0;
+    }
+    return layer_ID;
+}
+
+/* Stores the values in the config, which GIMP keeps for the next
+   interactive run and for "Repeat" (run with the last values) */
 static void
-save_vals(void) {
-    GimpLayer *pres_layer = gimp_layer_get_by_id(vals.pres_layer_ID);
-    GimpLayer *disc_layer = gimp_layer_get_by_id(vals.disc_layer_ID);
-    GimpLayer *rigmask_layer = gimp_layer_get_by_id(vals.rigmask_layer_ID);
+save_vals(GimpProcedureConfig *config) {
+    GimpLayer *pres_layer = ui_vals.pres_status ? gimp_layer_get_by_id(vals.pres_layer_ID) : NULL;
+    GimpLayer *disc_layer = ui_vals.disc_status ? gimp_layer_get_by_id(vals.disc_layer_ID) : NULL;
+    GimpLayer *rigmask_layer = ui_vals.rigmask_status ? gimp_layer_get_by_id(vals.rigmask_layer_ID) : NULL;
 
     set_aux_layer_name(pres_layer, ui_vals.pres_status, vals.pres_layer_name);
     set_aux_layer_name(disc_layer, ui_vals.disc_status, vals.disc_layer_name);
     set_aux_layer_name(rigmask_layer, ui_vals.rigmask_status, vals.rigmask_layer_name);
 
-    // TODO: Implement proper data storage in GIMP 3.0
-    // For now, just store in memory
-    static PlugInVals saved_vals;
-    static PlugInUIVals saved_ui_vals;
-    static PlugInColVals saved_col_vals;
-
-    memcpy(&saved_vals, &vals, sizeof(vals));
-    memcpy(&saved_ui_vals, &ui_vals, sizeof(ui_vals));
-    memcpy(&saved_col_vals, &col_vals, sizeof(col_vals));
+    g_object_set(config,
+                 "width", vals.new_width,
+                 "height", vals.new_height,
+                 "pres-layer", pres_layer,
+                 "pres-coeff", vals.pres_coeff,
+                 "disc-layer", disc_layer,
+                 "disc-coeff", vals.disc_coeff,
+                 "rigidity", (gdouble) vals.rigidity,
+                 "rigidity-mask-layer", rigmask_layer,
+                 "delta-x", vals.delta_x,
+                 "enl-step", (gdouble) vals.enl_step,
+                 "resize-aux-layers", vals.resize_aux_layers,
+                 "resize-canvas", vals.resize_canvas,
+                 "output-target", vals.output_target,
+                 "seams", vals.output_seams,
+                 "nrg-func", vals.nrg_func,
+                 "res-order", vals.res_order,
+                 "mask-behavior", vals.mask_behavior,
+                 "scaleback", vals.scaleback,
+                 "scaleback-mode", vals.scaleback_mode,
+                 "no-disc-on-enlarge", vals.no_disc_on_enlarge,
+                 "pres-layer-name", vals.pres_layer_name,
+                 "disc-layer-name", vals.disc_layer_name,
+                 "rigmask-layer-name", vals.rigmask_layer_name,
+                 "selected-layer-name", "",
+                 NULL);
 }
 
 static void
-retrieve_vals(void) {
-    /* Possibly retrieve data  */
-    // TODO: Implement proper data retrieval in GIMP 3.0
-    // For now, just use defaults
-    vals = default_vals;
-    ui_vals = default_ui_vals;
-    col_vals = default_col_vals;
+copy_name(gchar *dest, gchar *src) {
+    g_strlcpy(dest, src ? src : "", VALS_MAX_NAME_LENGTH);
+    g_free(src);
 }
 
+/* Reads the values from the config: the arguments of a non-interactive
+   call, or the values of the last run */
 static void
-retrieve_vals_use_aux_layers_names(gint32 image_ID) {
-    /* Possibly retrieve data and set aux layers from names */
-    retrieve_vals();
-
-    vals.pres_layer_ID = layer_from_name(image_ID, vals.pres_layer_name);
-    vals.disc_layer_ID = layer_from_name(image_ID, vals.disc_layer_name);
-    vals.rigmask_layer_ID = layer_from_name(image_ID, vals.rigmask_layer_name);
-}
-
-static void
-noninteractive_read_vals(GimpProcedureConfig *config, GimpImage *image) {
+read_vals(GimpProcedureConfig *config, GimpImage *image) {
     gint32 image_ID;
-    gint32 aux_pres_layer_ID;
-    gint32 aux_disc_layer_ID;
-    gint32 aux_rigmask_layer_ID;
     gint32 aux_selected_layer_ID;
-
-    image_ID = gimp_image_get_id(image);
-
-    /* Read parameters using GimpProcedureConfig */
-    g_object_get(config,
-                 "width", &vals.new_width,
-                 "height", &vals.new_height,
-                 "pres_coeff", &vals.pres_coeff,
-                 "disc_coeff", &vals.disc_coeff,
-                 "rigidity", &vals.rigidity,
-                 "delta_x", &vals.delta_x,
-                 "enl_step", &vals.enl_step,
-                 "resize_aux_layers", &vals.resize_aux_layers,
-                 "resize_canvas", &vals.resize_canvas,
-                 "output_target", &vals.output_target,
-                 "seams", &vals.output_seams,
-                 "nrg_func", &vals.nrg_func,
-                 "res_order", &vals.res_order,
-                 "mask_behavior", &vals.mask_behavior,
-                 "scaleback", &vals.scaleback,
-                 "scaleback_mode", &vals.scaleback_mode,
-                 "no_disc_on_enlarge", &vals.no_disc_on_enlarge,
-                 NULL);
-
-    /* Get string parameters */
-    g_object_get(config,
-                 "pres_layer_name", &vals.pres_layer_name,
-                 "disc_layer_name", &vals.disc_layer_name,
-                 "rigmask_layer_name", &vals.rigmask_layer_name,
-                 "selected_layer_name", &vals.selected_layer_name,
-                 NULL);
-
-    /* Get layer parameters */
+    gdouble rigidity, enl_step;
+    gchar *pres_layer_name, *disc_layer_name, *rigmask_layer_name, *selected_layer_name;
     GimpLayer *pres_layer = NULL;
     GimpLayer *disc_layer = NULL;
     GimpLayer *rigmask_layer = NULL;
 
+    image_ID = gimp_image_get_id(image);
+
+    /* the arguments are gint, gboolean or gdouble; strings and layers are
+       returned as new copies and references */
     g_object_get(config,
-                 "pres_layer", &pres_layer,
-                 "disc_layer", &disc_layer,
-                 "rigidity_mask_layer", &rigmask_layer,
+                 "width", &vals.new_width,
+                 "height", &vals.new_height,
+                 "pres-coeff", &vals.pres_coeff,
+                 "disc-coeff", &vals.disc_coeff,
+                 "rigidity", &rigidity,
+                 "delta-x", &vals.delta_x,
+                 "enl-step", &enl_step,
+                 "resize-aux-layers", &vals.resize_aux_layers,
+                 "resize-canvas", &vals.resize_canvas,
+                 "output-target", &vals.output_target,
+                 "seams", &vals.output_seams,
+                 "nrg-func", &vals.nrg_func,
+                 "res-order", &vals.res_order,
+                 "mask-behavior", &vals.mask_behavior,
+                 "scaleback", &vals.scaleback,
+                 "scaleback-mode", &vals.scaleback_mode,
+                 "no-disc-on-enlarge", &vals.no_disc_on_enlarge,
+                 "pres-layer-name", &pres_layer_name,
+                 "disc-layer-name", &disc_layer_name,
+                 "rigmask-layer-name", &rigmask_layer_name,
+                 "selected-layer-name", &selected_layer_name,
+                 "pres-layer", &pres_layer,
+                 "disc-layer", &disc_layer,
+                 "rigidity-mask-layer", &rigmask_layer,
                  NULL);
 
-    /* Convert GimpLayer objects to IDs if available */
-    if (pres_layer)
-        vals.pres_layer_ID = gimp_item_get_id(GIMP_ITEM(pres_layer));
-    else
-        vals.pres_layer_ID = layer_from_name(image_ID, vals.pres_layer_name);
+    vals.rigidity = rigidity;
+    vals.enl_step = enl_step;
+    copy_name(vals.pres_layer_name, pres_layer_name);
+    copy_name(vals.disc_layer_name, disc_layer_name);
+    copy_name(vals.rigmask_layer_name, rigmask_layer_name);
+    copy_name(vals.selected_layer_name, selected_layer_name);
 
-    if (disc_layer)
-        vals.disc_layer_ID = gimp_item_get_id(GIMP_ITEM(disc_layer));
-    else
-        vals.disc_layer_ID = layer_from_name(image_ID, vals.disc_layer_name);
+    vals.pres_layer_ID = aux_layer_from_config(pres_layer, image, vals.pres_layer_name);
+    vals.disc_layer_ID = aux_layer_from_config(disc_layer, image, vals.disc_layer_name);
+    vals.rigmask_layer_ID = aux_layer_from_config(rigmask_layer, image, vals.rigmask_layer_name);
+    g_clear_object(&pres_layer);
+    g_clear_object(&disc_layer);
+    g_clear_object(&rigmask_layer);
 
-    if (rigmask_layer)
-        vals.rigmask_layer_ID = gimp_item_get_id(GIMP_ITEM(rigmask_layer));
-    else
-        vals.rigmask_layer_ID = layer_from_name(image_ID, vals.rigmask_layer_name);
-
-    /* Find auxiliary layers by name if needed */
+    /* the layer to rescale can be given by name */
     aux_selected_layer_ID = layer_from_name(image_ID, vals.selected_layer_name);
     if (aux_selected_layer_ID) {
-        drawable = gimp_drawable_get_by_id(aux_selected_layer_ID);
+        drawable_vals.layer_ID = aux_selected_layer_ID;
     }
 
     /* Update status flags */
-    if (vals.pres_layer_ID) {
-        ui_vals.pres_status = TRUE;
-    }
-    if (vals.disc_layer_ID) {
-        ui_vals.disc_status = TRUE;
-    }
-    if (vals.rigmask_layer_ID) {
-        ui_vals.rigmask_status = TRUE;
-    }
+    ui_vals.pres_status = (vals.pres_layer_ID != 0);
+    ui_vals.disc_status = (vals.disc_layer_ID != 0);
+    ui_vals.rigmask_status = (vals.rigmask_layer_ID != 0);
 }
 
 static void
