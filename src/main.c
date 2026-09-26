@@ -52,6 +52,10 @@ static void             noninteractive_read_vals           (GimpProcedureConfig 
 static void             install_custom_signals             (void);
 static void             cancel_work_on_aux_layer           (void);
 static GList           *lqr_query_procedures               (GimpPlugIn *plug_in);
+static gboolean         lqr_set_i18n                       (GimpPlugIn *plug_in,
+                                                            const gchar *procedure_name,
+                                                            gchar **gettext_domain,
+                                                            gchar **catalog_dir);
 static GimpProcedure   *lqr_create_procedure               (GimpPlugIn *plug_in,
                                                             const gchar *name);
 static GimpValueArray  *lqr_run                            (GimpProcedure *procedure,
@@ -124,7 +128,19 @@ lqr_plugin_class_init(LqrPluginClass *klass) {
 
     plug_in_class->query_procedures = lqr_query_procedures;
     plug_in_class->create_procedure = lqr_create_procedure;
-//  plug_in_class->set_i18n          = STD_SET_I18N;
+    plug_in_class->set_i18n = lqr_set_i18n;
+}
+
+/* The translations are installed as locale/<language>/LC_MESSAGES/
+   GETTEXT_PACKAGE.mo next to the plug-in; libgimp binds the domain before
+   the procedures are queried or run, and translates the menu label with it */
+static gboolean
+lqr_set_i18n(GimpPlugIn *plug_in,
+             const gchar *procedure_name,
+             gchar **gettext_domain,
+             gchar **catalog_dir) {
+    *gettext_domain = g_strdup(GETTEXT_PACKAGE);
+    return TRUE;
 }
 
 static void
@@ -348,17 +364,6 @@ lqr_run(
     gint dialog_I_resp;
     gint dialog_aux_resp;
     gboolean render_success = FALSE;
-
-    /*  Initialize i18n support  */
-#if defined(G_OS_WIN32)
-    bindtextdomain (GETTEXT_PACKAGE, gimp_locale_directory());
-#else
-    bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
-#endif
-#ifdef HAVE_BIND_TEXTDOMAIN_CODESET
-    bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
-#endif
-    textdomain(GETTEXT_PACKAGE);
 
     /* Initialize default colors */
     initialize_default_colors();
