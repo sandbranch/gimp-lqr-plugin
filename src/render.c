@@ -415,7 +415,7 @@ render_noninteractive(PlugInVals *vals,
                 }
 
                 if (vals->resize_canvas == TRUE) {
-                    gimp_layer_resize_id(layer_ID, sb_width, sb_height, 0, 0);
+                    gimp_image_resize_id(image_ID, sb_width, sb_height, 0, 0);
                     gimp_layer_scale_id(layer_ID, sb_width, sb_height, FALSE);
                 } else {
                     scale_layer_translated(layer_ID, sb_width, sb_height, x_off, y_off);
