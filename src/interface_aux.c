@@ -185,6 +185,7 @@ dialog_aux(
     gimp_displays_flush();
 
     gimp_context_set_foreground(saved_colour);
+    g_object_unref(saved_colour);
 
     g_free(state);
     g_free(ui_state);

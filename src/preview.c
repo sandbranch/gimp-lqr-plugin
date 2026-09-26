@@ -121,10 +121,11 @@ preview_area_create(PreviewData *p_data) {
 
 void
 size_info_scale(SizeInfo *size_info, gdouble factor) {
-    size_info->x_off = (guint) (size_info->x_off / factor);
-    size_info->y_off = (guint) (size_info->y_off / factor);
-    size_info->width = (guint) (size_info->width / factor);
-    size_info->height = (guint) (size_info->height / factor);
+    /* offsets can be negative; a thumbnail is at least 1 pixel */
+    size_info->x_off = (gint) (size_info->x_off / factor);
+    size_info->y_off = (gint) (size_info->y_off / factor);
+    size_info->width = MAX((gint) (size_info->width / factor), 1);
+    size_info->height = MAX((gint) (size_info->height / factor), 1);
 }
 
 void
@@ -135,6 +136,11 @@ preview_composite(PreviewData *p_data, GdkPixbuf *src_pixbuf, SizeInfo *size_inf
     gint dest_y = MAX(0, y_off);
     gint dest_width = MIN(p_data->width, size_info->width + x_off) - dest_x;
     gint dest_height = MIN(p_data->height, size_info->height + y_off) - dest_y;
+
+    /* a mask outside of the layer */
+    if ((src_pixbuf == NULL) || (dest_width <= 0) || (dest_height <= 0)) {
+        return;
+    }
     gdk_pixbuf_composite(src_pixbuf, p_data->pixbuf, dest_x, dest_y, dest_width, dest_height, (gdouble) x_off,
                          (gdouble) y_off, 1.0, 1.0, GDK_INTERP_BILINEAR, 127);
 }
