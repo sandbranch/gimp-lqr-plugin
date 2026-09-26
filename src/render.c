@@ -205,6 +205,8 @@ render_init_carver(PlugInImageVals *image_vals,
         gimp_image_undo_group_start_id(image_ID);
         layer_ID = gimp_layer_new_from_drawable_id(layer_ID, image_ID);
         gimp_image_insert_layer_id(image_ID, layer_ID, 0, -1);
+        /* GIMP 3 names the copy "<name> copy" */
+        gimp_drawable_set_name_id(layer_ID, layer_name);
         gimp_layer_set_offsets(GIMP_LAYER(gimp_drawable_get_by_id(layer_ID)), 0, 0);
         gimp_item_set_visible(GIMP_ITEM(gimp_drawable_get_by_id(layer_ID)), TRUE);
         if (vals->resize_aux_layers) {
@@ -838,12 +840,17 @@ check_aux_layer_bpp(LqrCarverList **carver_list_p, gint32 layer_ID) {
 static gboolean copy_aux_layer_to_new_image(gint32 image_ID, gint32 *layer_ID_p, gint x_off, gint y_off) {
     gint32 old_layer_ID;
     gint32 new_layer_ID;
+    gint aux_x_off, aux_y_off;
 
     old_layer_ID = *layer_ID_p;
     if (old_layer_ID) {
         new_layer_ID = gimp_layer_new_from_drawable_id(old_layer_ID, image_ID);
         gimp_image_insert_layer_id(image_ID, new_layer_ID, 0, -1);
-        gimp_layer_set_offsets(GIMP_LAYER(gimp_drawable_get_by_id(new_layer_ID)), 0, 0);
+        gimp_drawable_set_name_id(new_layer_ID, gimp_item_get_name_id(old_layer_ID));
+        /* where it was relative to the layer, which goes to the origin */
+        gimp_drawable_get_offsets_id(old_layer_ID, &aux_x_off, &aux_y_off);
+        gimp_layer_set_offsets(GIMP_LAYER(gimp_drawable_get_by_id(new_layer_ID)),
+                               aux_x_off - x_off, aux_y_off - y_off);
     } else {
         new_layer_ID = 0;
     }
