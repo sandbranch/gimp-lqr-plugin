@@ -330,14 +330,15 @@ render_noninteractive(PlugInVals *vals,
     }
 
     if (vals->output_seams) {
-        gchar color_str[64];
-        g_snprintf(color_str, sizeof(color_str), "rgba(%g,%g,%g,1.0)", col_vals->r1, col_vals->g1, col_vals->b1);
-        colour_start = gegl_color_new(color_str);
-        g_snprintf(color_str, sizeof(color_str), "rgba(%g,%g,%g,1.0)", col_vals->r2, col_vals->g2, col_vals->b2);
-        colour_end = gegl_color_new(color_str);
+        LqrRetVal ret;
 
-        MEM_CHECK1 (write_all_vmaps(lqr_vmap_list_start(carver), image_ID, layer_name, x_off,
-                                    y_off, colour_start, colour_end));
+        colour_start = render_seams_colour(col_vals->r1, col_vals->g1, col_vals->b1);
+        colour_end = render_seams_colour(col_vals->r2, col_vals->g2, col_vals->b2);
+        ret = write_all_vmaps(lqr_vmap_list_start(carver), image_ID, layer_name, x_off,
+                              y_off, colour_start, colour_end);
+        g_object_unref(colour_start);
+        g_object_unref(colour_end);
+        MEM_CHECK1 (ret);
     }
 
     if (vals->resize_canvas) {
@@ -657,6 +658,7 @@ render_dump_vmap(PlugInVals *vals,
     gchar vmap_name[LQR_MAX_NAME_LENGTH];
     gint x_off, y_off;
     GeglColor *colour_start, *colour_end;
+    LqrRetVal ret;
 #ifdef __CLOCK_IT__
     double clock1, clock2, clock3;
 #endif /* __CLOCK_IT__ */
@@ -695,11 +697,8 @@ render_dump_vmap(PlugInVals *vals,
     fflush (stdout);
 #endif /* __CLOCK_IT__ */
 
-    gchar color_str[64];
-    g_snprintf(color_str, sizeof(color_str), "rgba(%g,%g,%g,1.0)", col_vals->r1, col_vals->g1, col_vals->b1);
-    colour_start = gegl_color_new(color_str);
-    g_snprintf(color_str, sizeof(color_str), "rgba(%g,%g,%g,1.0)", col_vals->r2, col_vals->g2, col_vals->b2);
-    colour_end = gegl_color_new(color_str);
+    colour_start = render_seams_colour(col_vals->r1, col_vals->g1, col_vals->b1);
+    colour_end = render_seams_colour(col_vals->r2, col_vals->g2, col_vals->b2);
 
     vmap_data.image_ID = image_ID;
     vmap_data.name = vmap_name;
@@ -711,7 +710,10 @@ render_dump_vmap(PlugInVals *vals,
 
     set_tiles(lqr_vmap_get_width(vmap));
 
-    MEM_CHECK1 (write_vmap_to_layer(vmap, (gpointer) (&vmap_data)));
+    ret = write_vmap_to_layer(vmap, (gpointer) (&vmap_data));
+    g_object_unref(colour_start);
+    g_object_unref(colour_end);
+    MEM_CHECK1 (ret);
 
 #ifdef __CLOCK_IT__
     clock3 = (double) clock () / CLOCKS_PER_SEC;
@@ -721,6 +723,16 @@ render_dump_vmap(PlugInVals *vals,
     gimp_image_set_active_layer_id(image_ID, layer_ID);
 
     return TRUE;
+}
+
+/* The seam colours, R'G'B' values from 0 to 1, as a GeglColor */
+GeglColor *
+render_seams_colour(gdouble r, gdouble g, gdouble b) {
+    GeglColor *colour = gegl_color_new(NULL);
+    gdouble rgba[4] = {r, g, b, 1.0};
+
+    gegl_color_set_pixel(colour, babl_format("R'G'B'A double"), rgba);
+    return colour;
 }
 
 static gboolean

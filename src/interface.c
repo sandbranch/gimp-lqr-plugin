@@ -37,6 +37,7 @@
 #include "interface.h"
 #include "preview.h"
 #include "layers_combo.h"
+#include "render.h"
 
 
 /***  Constants  ***/
@@ -711,10 +712,7 @@ dialog(
                       G_CALLBACK(callback_out_seams_button),
                       (gpointer) &(state->output_seams));
 
-    colour = gegl_color_new("black");
-    gegl_color_set_rgba(colour, col_vals->r2, col_vals->g2, col_vals->b2, 1.0);
-
-//    //gimp_rgba_set(colour, col_vals->r2, col_vals->g2, col_vals->b2, 1);
+    colour = render_seams_colour(col_vals->r2, col_vals->g2, col_vals->b2);
 
     out_seams_col_button2 =
             gimp_color_button_new(_("Last seams colour"), 14, 14, colour,
@@ -730,8 +728,8 @@ dialog(
     gimp_help_set_help_data(out_seams_col_button2,
                             _("Colour to use for the last seams"), NULL);
 
-    // gimp_rgba_set(colour, col_vals->r1, col_vals->g1, col_vals->b1, 1);
-    gegl_color_set_rgba(colour, col_vals->r1, col_vals->g1, col_vals->b1, 1.0);
+    g_object_unref(colour);
+    colour = render_seams_colour(col_vals->r1, col_vals->g1, col_vals->b1);
 
     out_seams_col_button1 =
             gimp_color_button_new(_("First seams colour"), 14, 14, colour,
@@ -747,7 +745,7 @@ dialog(
     gimp_help_set_help_data(out_seams_col_button1,
                             _("Colour to use for the first seams"), NULL);
 
-//    g_free(colour);
+    g_object_unref(colour);
 
     scaleback_button =
             gtk_check_button_new_with_label(_("Scale back to the original size"));

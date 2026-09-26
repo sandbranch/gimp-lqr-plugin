@@ -186,43 +186,33 @@ callback_out_seams_button(GtkWidget *button, gpointer data) {
             gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON (button));
 }
 
-void
-callback_out_seams_col_button1(GtkWidget *button, gpointer data) {
+/* The seam colours are kept as R'G'B' values from 0 to 1, as in GIMP 2 */
+static void
+get_seams_colour(GtkWidget *button, gdouble *r, gdouble *g, gdouble *b) {
     GeglColor *colour;
-    PlugInColVals *col_data = (PlugInColVals *) data;
     gdouble rgba[4];
 
-    colour = gegl_color_new("rgba(0,0,0,1)");
     colour = gimp_color_button_get_color(GIMP_COLOR_BUTTON(button));
+    gegl_color_get_pixel(colour, babl_format("R'G'B'A double"), rgba);
+    g_object_unref(colour);
 
-    // Extract RGBA components from GeglColor
-    gegl_color_get_rgba(colour, &rgba[0], &rgba[1], &rgba[2], &rgba[3]);
+    *r = rgba[0];
+    *g = rgba[1];
+    *b = rgba[2];
+}
 
-    col_data->r1 = rgba[0];
-    col_data->g1 = rgba[1];
-    col_data->b1 = rgba[2];
+void
+callback_out_seams_col_button1(GtkWidget *button, gpointer data) {
+    PlugInColVals *col_data = (PlugInColVals *) data;
 
-    g_object_unref(colour);  // Use g_object_unref instead of g_free
+    get_seams_colour(button, &col_data->r1, &col_data->g1, &col_data->b1);
 }
 
 void
 callback_out_seams_col_button2(GtkWidget *button, gpointer data) {
-    GeglColor *colour;
     PlugInColVals *col_data = (PlugInColVals *) data;
-    gdouble rgba[4];
 
-    colour = gegl_color_new("rgba(0,0,0,1)");
-    colour = gimp_color_button_get_color(GIMP_COLOR_BUTTON
-                                                 (button));
-
-    // Extract RGBA components from GeglColor
-    gegl_color_get_rgba(colour, &rgba[0], &rgba[1], &rgba[2], &rgba[3]);
-
-    col_data->r1 = rgba[0];
-    col_data->g1 = rgba[1];
-    col_data->b1 = rgba[2];
-
-    g_free(colour);
+    get_seams_colour(button, &col_data->r2, &col_data->g2, &col_data->b2);
 }
 
 void

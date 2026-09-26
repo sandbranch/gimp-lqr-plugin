@@ -65,4 +65,7 @@ render_dump_vmap(PlugInVals *vals,
                  CarverData *carver_data,
                  gint32 *vmap_layer_ID_p);
 
+GeglColor *
+render_seams_colour(gdouble r, gdouble g, gdouble b);
+
 #endif /* __RENDER_H__ */

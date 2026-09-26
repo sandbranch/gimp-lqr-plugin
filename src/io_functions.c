@@ -217,6 +217,7 @@ write_vmap_to_layer(LqrVMap *vmap, gpointer data) {
     GeglColor *col_start, *col_end;
     guchar *outrow;
     gdouble value, rd, gr, bl, al;
+    gdouble start_rgba[4], end_rgba[4];
     gint vs, y, x, k;
     gint update_step;
 
@@ -255,11 +256,14 @@ write_vmap_to_layer(LqrVMap *vmap, gpointer data) {
     } else {
         gimp_layer_resize_id(seam_layer_ID, w, h, 0, 0);
     }
-    buffer_out = gimp_drawable_get_buffer(GIMP_DRAWABLE(gimp_drawable_get_by_id(seam_layer_ID)));
-
     bpp = 4;
 
     CATCH_MEM (outrow = g_try_new(guchar, w * bpp));
+
+    buffer_out = gimp_drawable_get_buffer(GIMP_DRAWABLE(gimp_drawable_get_by_id(seam_layer_ID)));
+
+    gegl_color_get_pixel(col_start, babl_format("R'G'B'A double"), start_rgba);
+    gegl_color_get_pixel(col_end, babl_format("R'G'B'A double"), end_rgba);
 
     for (y = 0; y < h; y++) {
         for (x = 0; x < w; x++) {
@@ -270,9 +274,6 @@ write_vmap_to_layer(LqrVMap *vmap, gpointer data) {
                 }
             } else {
                 value = (double) (depth + 1 - vs) / (depth + 1);
-                gdouble start_rgba[4], end_rgba[4];
-                gegl_color_get_pixel(col_start, babl_format("R'G'B'A double"), start_rgba);
-                gegl_color_get_pixel(col_end, babl_format("R'G'B'A double"), end_rgba);
                 rd = value * start_rgba[0] + (1 - value) * end_rgba[0];
                 gr = value * start_rgba[1] + (1 - value) * end_rgba[1];
                 bl = value * start_rgba[2] + (1 - value) * end_rgba[2];
@@ -294,6 +295,7 @@ write_vmap_to_layer(LqrVMap *vmap, gpointer data) {
     gimp_drawable_update(GIMP_DRAWABLE(gimp_drawable_get_by_id(seam_layer_ID)), 0, 0, w, h);
     gimp_item_set_visible(GIMP_ITEM(gimp_drawable_get_by_id(seam_layer_ID)), TRUE);
     g_object_unref(buffer_out);
+    g_free(outrow);
 
     gimp_progress_end();
 
