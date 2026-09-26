@@ -4,11 +4,46 @@ GIMP LiquidRescale Plug-In
 Copyright (C) 2007-2010 Carlo Baldassi <carlobaldassi@gmail.com>
 (implementation based on the GIMP Plug-in Template by Michael Natterer)
 
-This package is a plug-in for GIMP 2.4 or newer. It is a frontend to
+This package is a plug-in for GIMP 3.0 or newer (this branch; GIMP 2
+needs the releases before the port). It is a frontend to
 the LiquidRescale Library (liblqr) which implements the algorithm
 described in the paper "Seam Carving for Content-Aware Image Resizing"
 by Shai Avidan and Ariel Shamir, which can be found at
 https://faculty.idc.ac.il/arik/SCWeb/imret/imret.pdf
+
+Building and installing (GIMP 3)
+--------------------------------
+
+The build uses meson. liblqr is taken from the system if it has it
+(pkg-config lqr-1), otherwise it is downloaded and built into the
+plug-in (-Dbundled_liblqr=enabled forces that):
+
+    meson setup build -Dgimp_plugindir=$HOME/.config/GIMP/3.2/plug-ins/gimp-lqr-plugin
+    ninja -C build install
+
+(3.2 is the profile folder of GIMP 3.2; GIMP 3.0 uses 3.0.)
+
+Without -Dgimp_plugindir the plug-in goes to the plug-in folder of the
+GIMP installation that pkg-config finds. The translations and the manual
+are installed next to the plug-in (locale/ and help/). The plug-in is
+Layer > Liquid rescale..., and plug-in-lqr in the procedure browser.
+The INSTALL file is the generic text of autotools, which this branch no
+longer uses.
+
+For the Flatpak GIMP, gimp-plugin-devtools/gimp-build.sh (from
+github.com/sandbranch/gimp-plugin-devtools, next to this folder) runs the
+same commands inside the GNOME SDK that GIMP was built with.
+
+Tests
+-----
+
+    tests/run.sh          # or tests/run.sh --asan
+
+builds the plug-in into tests/output and tests it in the Flatpak GIMP
+without a window, with a throwaway GIMP profile in tests/output: your
+own profile and plug-ins are not touched. It prints PASS or FAIL for each
+case and exits non-zero on any failure. tests/gui/ opens the dialog on a
+Broadway display, to look at it; it is not part of the automatic tests.
 
 Happy GIMPing,
 --Carlo
