@@ -11,6 +11,11 @@ described in the paper "Seam Carving for Content-Aware Image Resizing"
 by Shai Avidan and Ariel Shamir, which can be found at
 https://faculty.idc.ac.il/arik/SCWeb/imret/imret.pdf
 
+This is the faithful GIMP 3 port of the original plug-in. A successor
+with the parts to keep, remove and keep straight painted right in its
+dialog, and a live preview, is Liquid Rescale TNG:
+https://github.com/sandbranch/gimp-lqr-tng
+
 Building and installing (GIMP 3)
 --------------------------------
 
