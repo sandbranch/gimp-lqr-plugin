@@ -44,6 +44,14 @@
 #define MEM_CHECK(x) if ((x) == NULL) { g_message(_("Not enough memory")); return FALSE; }
 #define MEM_CHECK1(x) if ((x) == LQR_NOMEM) { g_message(_("Not enough memory")); return FALSE; }
 #define MEM_CHECK2(x) if ((x) == FALSE) { g_message(_("Not enough memory")); return FALSE; }
+#define RESIZE_CHECK(x) G_STMT_START { \
+  LqrRetVal ret = (x); \
+  if (ret != LQR_OK) \
+    { \
+      g_message(ret == LQR_NOMEM ? _("Not enough memory") : _("Error: rescaling failed")); \
+      return FALSE; \
+    } \
+  } G_STMT_END
 
 #define BPP_CHECK(layer_ID, carver) G_STMT_START { \
   if (layer_channels(layer_ID) != lqr_carver_get_channels(carver)) \
@@ -105,6 +113,10 @@ static gboolean write_aux_carver(LqrCarverList **carver_list_p, gint32 layer_ID,
 
 static void scale_layer_translated(gint32 layer_ID, gint width, gint height, gint x_off, gint y_off);
 
+static gboolean passes_supported(gint width, gint height, gint new_width, gint new_height, gint res_order);
+
+static gboolean size_supported(gint width, gint height, gint new_width, gint new_height, gint *res_order);
+
 /* render functions */
 
 CarverData *
@@ -146,6 +158,24 @@ render_init_carver(PlugInImageVals *image_vals,
     LAYER_CHECK0 (vals->disc_layer_ID, NULL);
     LAYER_CHECK0 (vals->rigmask_layer_ID, NULL);
 
+    old_width = gimp_drawable_get_width_id(layer_ID);
+    old_height = gimp_drawable_get_height_id(layer_ID);
+    new_width = vals->new_width;
+    new_height = vals->new_height;
+
+    /* refuse before anything is changed */
+    if (!interactive) {
+        if (!size_supported(old_width, old_height, new_width, new_height, &vals->res_order)) {
+            return NULL;
+        }
+        if (vals->scaleback && (vals->scaleback_mode == SCALEBACK_MODE_LQRBACK) &&
+            !passes_supported(new_width, new_height, old_width, old_height, vals->res_order)) {
+            g_message(_("Cannot rescale %d x %d to %d x %d: seam carving needs at least 2 pixels in both directions"),
+                      new_width, new_height, old_width, old_height);
+            return NULL;
+        }
+    }
+
     UNFLOAT (layer_ID);
     SELECTION_SAVE (image_ID);
     UNMASK (layer_ID);
@@ -153,13 +183,8 @@ render_init_carver(PlugInImageVals *image_vals,
     g_snprintf(layer_name, LQR_MAX_NAME_LENGTH, "%s",
                gimp_item_get_name_id(layer_ID));
 
-    old_width = gimp_drawable_get_width_id(layer_ID);
-    old_height = gimp_drawable_get_height_id(layer_ID);
     gimp_drawable_get_offsets_id(layer_ID, &x_off, &y_off);
     bpp = layer_channels(layer_ID);
-
-    new_width = vals->new_width;
-    new_height = vals->new_height;
     rigidity = rigidity_init(vals);
 
     if (!interactive) {
@@ -309,7 +334,7 @@ render_noninteractive(PlugInVals *vals,
     clock1 = (double) clock () / CLOCKS_PER_SEC;
 #endif /* __CLOCK_IT__ */
 
-    MEM_CHECK1 (lqr_carver_resize(carver, new_width, new_height));
+    RESIZE_CHECK (lqr_carver_resize(carver, new_width, new_height));
 
     if (vals->scaleback) {
         switch (vals->scaleback_mode) {
@@ -317,7 +342,7 @@ render_noninteractive(PlugInVals *vals,
                 MEM_CHECK1 (lqr_carver_flatten(carver));
                 new_width = old_width;
                 new_height = old_height;
-                MEM_CHECK1 (lqr_carver_resize(carver, new_width, new_height));
+                RESIZE_CHECK (lqr_carver_resize(carver, new_width, new_height));
                 break;
             case SCALEBACK_MODE_STD:
             case SCALEBACK_MODE_STDW:
@@ -487,6 +512,13 @@ render_interactive(PlugInVals *vals,
     new_width = vals->new_width;
     new_height = vals->new_height;
 
+    if (!passes_supported(lqr_carver_get_width(carver), lqr_carver_get_height(carver),
+                          new_width, new_height, vals->res_order)) {
+        g_message(_("Cannot rescale to %d x %d: seam carving needs at least 2 pixels in both directions"),
+                  new_width, new_height);
+        return FALSE;
+    }
+
     gimp_layer_set_lock_alpha_id(layer_ID, FALSE);
 
     if (vals->resize_aux_layers == TRUE) {
@@ -499,7 +531,7 @@ render_interactive(PlugInVals *vals,
         clock1 = (double) clock () / CLOCKS_PER_SEC;
 #endif /* __CLOCK_IT__ */
 
-    MEM_CHECK1 (lqr_carver_resize(carver, new_width, new_height));
+    RESIZE_CHECK (lqr_carver_resize(carver, new_width, new_height));
 
     if (vals->resize_canvas == TRUE) {
         gimp_image_resize_id(image_ID, new_width, new_height, -x_off, -y_off);
@@ -873,4 +905,35 @@ scale_layer_translated(gint32 layer_ID, gint width, gint height, gint x_off, gin
     gimp_layer_set_offsets(GIMP_LAYER(gimp_drawable_get_by_id(layer_ID)), 0, 0);
     gimp_layer_scale_id(layer_ID, width, height, FALSE);
     gimp_layer_set_offsets(GIMP_LAYER(gimp_drawable_get_by_id(layer_ID)), x_off, y_off);
+}
+
+/* liblqr reads outside of its buffers when it carves an image which is one
+   pixel wide or high, in either direction, so no pass (width or height) may
+   start from such a size. */
+static gboolean
+passes_supported(gint width, gint height, gint new_width, gint new_height, gint res_order) {
+    if (res_order == LQR_RES_ORDER_HOR) {
+        return ((new_width == width) || ((width > 1) && (height > 1))) &&
+               ((new_height == height) || ((new_width > 1) && (height > 1)));
+    }
+    return ((new_height == height) || ((width > 1) && (height > 1))) &&
+           ((new_width == width) || ((width > 1) && (new_height > 1)));
+}
+
+/* Whether width x height can be rescaled to new_width x new_height; swaps
+   the resize order where only the other order can do it. */
+static gboolean
+size_supported(gint width, gint height, gint new_width, gint new_height, gint *res_order) {
+    gint other = (*res_order == LQR_RES_ORDER_HOR) ? LQR_RES_ORDER_VERT : LQR_RES_ORDER_HOR;
+
+    if (passes_supported(width, height, new_width, new_height, *res_order)) {
+        return TRUE;
+    }
+    if (passes_supported(width, height, new_width, new_height, other)) {
+        *res_order = other;
+        return TRUE;
+    }
+    g_message(_("Cannot rescale %d x %d to %d x %d: seam carving needs at least 2 pixels in both directions"),
+              width, height, new_width, new_height);
+    return FALSE;
 }
