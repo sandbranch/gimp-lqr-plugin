@@ -3,7 +3,13 @@
 # the Flatpak GIMP without a window (see lqr-test.py). GIMP runs with a
 # throwaway profile in tests/output/profile (GIMP3_DIRECTORY), where the
 # plug-in is installed: your own GIMP profile and plug-ins are not used or
-# changed, and a running GIMP of yours does not matter.
+# changed, and a running GIMP of yours does not matter. The build and
+# GIMP run isolated from your folders (tests/isolate.sh, with
+# gimp-plugin-devtools/gimp-run.sh): HOME and the XDG folders inside the
+# Flatpak point into tests/output/gimp-home, so nothing lands in
+# ~/.var/app/org.gimp.GIMP either. Before and after, it lists your
+# folders of GIMP and the other apps (gimp-plugin-devtools/snapshot.sh)
+# and fails if anything there changed.
 #
 #   tests/run.sh          build, install into the test profile, test
 #   tests/run.sh --asan   the same with AddressSanitizer and UBSan
@@ -17,6 +23,12 @@ here=$(cd "$(dirname "$0")" && pwd)
 src=$(dirname "$here")
 out=$here/output
 devtools=${GIMP_PLUGIN_DEVTOOLS:-$src/../gimp-plugin-devtools}
+GIMP_RUN_HOME=$out/gimp-home
+export GIMP_RUN_HOME
+# shellcheck source=SCRIPTDIR/isolate.sh
+. "$here/isolate.sh"
+mkdir -p "$out"
+snapshot_take "$out/snapshot-before.txt"
 
 build=$out/build
 profile=$out/profile
@@ -47,10 +59,9 @@ fi
   >"$out/build.log" 2>&1 || { cat "$out/build.log"; exit 1; }
 
 # shellcheck disable=SC2086
-timeout 1800 flatpak run $run_args --filesystem="$src" --env=GIMP3_DIRECTORY="$profile" \
-  --env=LQR_ONLY="$LQR_ONLY" \
-  --command=gimp-console-3.2 org.gimp.GIMP \
-  --no-interface --no-data --batch-interpreter python-fu-eval \
+gimp_run --timeout=1800 --flatpak $run_args --filesystem="$src" --env=GIMP3_DIRECTORY="$profile" \
+  --env=LQR_ONLY="$LQR_ONLY" -- \
+  gimp-console-3.2 --no-interface --no-data --batch-interpreter python-fu-eval \
   -b "exec(open('$here/lqr-test.py').read())" --quit >"$log" 2>&1
 
 grep -E "^LQR|Traceback|^  File|Error" "$log"
@@ -69,5 +80,6 @@ for report in "$out"/sanitizer/*; do
     head -30 "$report"
     status=1
 done
+snapshot_check "$out/snapshot-before.txt" "LQR " || status=1
 [ $status = 0 ] && echo "LQR all passed" || echo "LQR FAILED (log: $log)"
 exit $status
