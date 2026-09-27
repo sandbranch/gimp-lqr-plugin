@@ -18,5 +18,5 @@ GIMP_RUN_HOME=${GIMP_RUN_HOME:-$tests/output/gimp-home}
 gimp_run --flatpak --filesystem="$src" --env=GDK_BACKEND=broadway --env=BROADWAY_DISPLAY=:5 \
   --env=GIMP3_DIRECTORY="$tests/output/profile" -- sh -c \
   "broadwayd --port 8085 :5 & bw=\$!; trap 'kill \$bw' EXIT; sleep 2; \
-   gimp-3.2 --no-splash \
+   gimp-3.2 --new-instance --no-splash \
    --batch-interpreter python-fu-eval -b \"exec(open('$here/open-dialog.py').read())\""
