@@ -1,7 +1,7 @@
 #!/bin/sh
 # Opens the Liquid Rescale dialog in the Flatpak GIMP on a Broadway display
 # (http://127.0.0.1:8085/), to look at it with
-# gimp-plugin-devtools/gui/cdp.mjs. The plug-in is the one tests/run.sh
+# gimp-devtools/gui/cdp.mjs. The plug-in is the one tests/run.sh
 # built and installed into its throwaway profile (tests/output/profile);
 # run that first. GIMP runs isolated from your own folders
 # (tests/isolate.sh), with the throwaway home of tests/run.sh, so a GIMP

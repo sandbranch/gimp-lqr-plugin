@@ -35,8 +35,8 @@ Layer > Liquid rescale..., and plug-in-lqr in the procedure browser.
 The INSTALL file is the generic text of autotools, which this branch no
 longer uses.
 
-For the Flatpak GIMP, gimp-plugin-devtools/gimp-build.sh (from
-github.com/sandbranch/gimp-plugin-devtools, next to this folder) runs the
+For the Flatpak GIMP, gimp-devtools/gimp-build.sh (from
+github.com/sandbranch/gimp-devtools, next to this folder) runs the
 same commands inside the GNOME SDK that GIMP was built with.
 
 Tests

@@ -5,10 +5,10 @@
 # plug-in is installed: your own GIMP profile and plug-ins are not used or
 # changed, and a running GIMP of yours does not matter. The build and
 # GIMP run isolated from your folders (tests/isolate.sh, with
-# gimp-plugin-devtools/gimp-run.sh): HOME and the XDG folders inside the
+# gimp-devtools/gimp-run.sh): HOME and the XDG folders inside the
 # Flatpak point into tests/output/gimp-home, so nothing lands in
 # ~/.var/app/org.gimp.GIMP either. Before and after, it lists your
-# folders of GIMP and the other apps (gimp-plugin-devtools/snapshot.sh)
+# folders of GIMP and the other apps (gimp-devtools/snapshot.sh)
 # and fails if anything there changed.
 #
 #   tests/run.sh          build, install into the test profile, test
@@ -18,11 +18,11 @@
 #
 # Prints PASS or FAIL for each case and exits non-zero if any case fails,
 # or if the plug-in printed warnings, criticals or sanitizer reports.
-# Needs ../gimp-plugin-devtools (or GIMP_PLUGIN_DEVTOOLS) for the build.
+# Needs ../gimp-devtools (or GIMP_PLUGIN_DEVTOOLS) for the build.
 here=$(cd "$(dirname "$0")" && pwd)
 src=$(dirname "$here")
 out=$here/output
-devtools=${GIMP_PLUGIN_DEVTOOLS:-$src/../gimp-plugin-devtools}
+devtools=${GIMP_PLUGIN_DEVTOOLS:-$src/../gimp-devtools}
 GIMP_RUN_HOME=$out/gimp-home
 export GIMP_RUN_HOME
 # shellcheck source=SCRIPTDIR/isolate.sh
